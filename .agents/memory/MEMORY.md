@@ -1,0 +1,13 @@
+- [AI mode isolation](ai-mode-isolation.md) — AI mention replies use separate state and bounded, scoped conversation memory from the Saved Messages bridge.
+- [AI credential verification](ai-credential-verification.md) — AI mode can load while the provider key is rejected; verify with a real mention after restart.
+- [AI provider selection](ai-provider-selection.md) — Telegram AI replies use only the configured Gemini provider.
+- [Mongo degraded startup](mongo-degraded-startup.md) — MongoDB outage must not prevent the PTB control bot from polling basic commands.
+- [Workflow secret injection](workflow-secret-injection.md) — Secret entries can exist in Replit settings while the console workflow still receives none of them.
+- [Gemini key rotation](gemini-key-rotation.md) — Saved keys take priority over the environment fallback and all Gemini callers share one quota-aware rotator.
+- [Provider key-state security](provider-key-state.md) — Environment fallback keys keep cooldown metadata without persisting their raw values.
+- [Telegram OTP delivery](telegram-otp-delivery.md) — Telethon may deliver login codes in-app instead of SMS; expose the returned delivery type and do not rely on deprecated force_sms.
+- [Mini App WebSocket proxy](mini-app-websocket-proxy.md) — Live PCM needs an HTTP upgrade tunnel through the public API proxy; ordinary fetch proxying returns 400 and drops audio.
+- [Mini App HTTP fallback](mini-app-http-fallback.md) — Mounted Express proxy routes must identify public document requests from originalUrl and serve a branded-independent offline page.
+- [Published app badge](replit-published-badge.md) — “Made with Replit” is a Starter-plan publishing badge, not Mini App source code.
+- [Live mic frame contract](live-mic-frame-contract.md) — NTgCalls external 48 kHz mono PCM16 input requires exactly 480 samples / 960 bytes per 10 ms frame.
+- [Live receive audio path](live-receive-audio-path.md) — Forward untouched INCOMING/SPEAKER StreamFrames through bounded subscribers to the Mini App playback worklet.
