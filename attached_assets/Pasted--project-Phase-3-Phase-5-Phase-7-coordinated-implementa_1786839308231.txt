@@ -1,0 +1,225 @@
+अब मेरे project में Phase 3, Phase 5 और Phase 7 — तीनों को एक coordinated implementation के रूप में पूरा करो।
+
+सबसे पहले existing project, Phase 1 implementation, Git checkpoint और current architecture को analyze करो। Existing functionality को break मत करना। कोई fake/demo implementation मत बनाना।
+
+मेरे मुख्य requirements:
+
+1. MINI APP → LIVE MICROPHONE → TELEGRAM VOICE CHAT
+
+Telegram Mini App के अंदर से मेरे phone का real microphone इस्तेमाल होना चाहिए।
+
+Flow:
+
+Telegram Mini App
+→ microphone permission
+→ real-time low-latency audio capture
+→ WebSocket
+→ Python backend
+→ authenticated user's existing UserbotClient
+→ existing VoiceChatManager
+→ PyTgCalls
+→ Telegram Voice Chat
+
+Existing `.vcjoin` से मेरा hosted userbot VC में join करता है। उसी existing session और VoiceChatManager को reuse करो।
+
+अगर user VC में connected नहीं है तो Mini App में साफ error दिखाओ।
+
+Browser में Telegram session string, API hash, bot token या कोई secret कभी expose मत करो।
+
+2. LIVE MIC CONTROLS
+
+Mini App में ये controls बनाओ:
+
+- Start Live
+- Stop Live
+- Mic ON/OFF
+- Push-To-Talk
+- Live connection status
+- VC connection status
+- Volume/Gain control
+
+Mic बंद होने पर audio Telegram VC में नहीं जाना चाहिए।
+
+Browser disconnect होने पर audio pipeline और server-side resources safely cleanup होने चाहिए।
+
+WebSocket reconnect सुरक्षित तरीके से implement करो, लेकिन duplicate audio streams नहीं बनने चाहिए।
+
+3. LIVE VOLUME / GAIN
+
+मेरे existing `.volume` command को break मत करो।
+
+Live microphone के लिए वही concept इस्तेमाल करो:
+
+100 = 1x
+200 = 2x
+500 = 5x
+1000 = 10x
+2000 = 20x
+आदि।
+
+जितनी value user देता है, उसी के अनुसार live microphone gain बढ़े।
+
+Artificially 100 या 200 जैसी छोटी maximum limit मत लगाओ।
+
+Library/PCM/FFmpeg की वास्तविक numeric limitation का सम्मान करो और overflow/clipping को technically handle करो।
+
+Noise reduction मत लगाओ।
+AI voice enhancement मत लगाओ।
+Voice changer मत लगाओ।
+Pitch change मत लगाओ।
+
+केवल आवश्यक resampling/channel conversion और gain processing करो।
+
+4. EXISTING `.play` COMPATIBILITY
+
+पहले verify करो कि current PyTgCalls version में `.play` और live microphone को simultaneously safely mix किया जा सकता है या नहीं।
+
+अगर proper audio mixer बनाना जरूरी है तो existing playback को break किए बिना mixer architecture implement करो।
+
+अगर current installed PyTgCalls APIs में simultaneous mixing safely possible नहीं है, तो पहले version में live mic शुरू करते समय active playback को रोकने/रोकने की स्पष्ट सूचना देने वाला safe behavior रखो।
+
+Existing `.play`, `.pause`, `.resume`, `.vcstop`, `.vcleave`, `.volume` और queue behavior को break मत करो।
+
+5. INCOMING VOICE CHAT AUDIO → MINI APP
+
+अब दूसरी direction भी implement करो:
+
+Telegram Voice Chat
+→ PyTgCalls incoming StreamFrames
+→ frame format detection/decoding
+→ browser-compatible audio
+→ WebSocket
+→ Mini App
+→ phone speaker/headphones
+
+पहले installed PyTgCalls 2.3.3 और ntgcalls 2.2.5 की वास्तविक APIs और StreamFrames payload format verify करो।
+
+अगर incoming audio payload reliably decode/convert किया जा सकता है, तो actual two-way audio implement करो।
+
+अगर current library में यह officially/technically possible नहीं है, तो fake audio मत बनाओ। Exact limitation document करो और UI में साफ status/error दिखाओ।
+
+6. TWO-WAY AUDIO
+
+Final target:
+
+मेरी आवाज़:
+Phone Mic
+→ Mini App
+→ Backend
+→ Hosted Userbot
+→ Telegram VC
+→ बाकी लोगों को मेरी आवाज़
+
+दूसरों की आवाज़:
+Telegram VC
+→ Hosted Userbot/PyTgCalls
+→ Backend
+→ Mini App
+→ मेरे phone पर audio
+
+दोनों directions को real audio के साथ test करो।
+
+7. SECURITY
+
+Existing Phase 1 Telegram WebApp HMAC authentication को reuse करो।
+
+हर WebSocket connection पर verified Telegram user ownership check करो।
+
+Verified Telegram user ID == hosted Userbot owner ID होना चाहिए।
+
+किसी दूसरे user को दूसरे user's hosted session या VoiceChatManager तक access नहीं मिलना चाहिए।
+
+Short-lived authorization ticket इस्तेमाल करो।
+
+Audio data MongoDB में persist मत करो।
+
+Logs में tokens, session strings या audio payloads मत लिखो।
+
+8. EXISTING BOT / HOSTING REGRESSION
+
+इन existing features को implementation के बाद test करो:
+
+/host
+/unhost
+.vcjoin
+.vcleave
+.vcstop
+.play
+.pause
+.resume
+.queue
+.clearqueue
+.volume
+.mute
+.unmute
+
+Existing plugin architecture और MongoDB behavior को preserve करो।
+
+पुराने commands को duplicate या replace मत करो।
+
+9. ERROR HANDLING
+
+इन situations को properly handle करो:
+
+- Mic permission denied
+- User not hosted
+- Hosted session offline
+- VC not connected
+- WebSocket disconnected
+- FFmpeg unavailable
+- Audio source failure
+- Unsupported PyTgCalls frame format
+- Invalid volume
+- Telegram session unauthorized
+- Browser refresh
+- Network reconnect
+- Bot restart
+
+किसी एक user's audio error से पूरा Telegram bot crash नहीं होना चाहिए।
+
+10. TESTING
+
+Implementation के बाद वास्तविक end-to-end testing करो:
+
+A. Mini App open
+B. Telegram authentication
+C. Hosted account verification
+D. `.vcjoin`
+E. Mic permission
+F. Start Live
+G. बोलकर actual Telegram VC में आवाज़ verify करो
+H. Mic ON/OFF
+I. Push-To-Talk
+J. Volume 100
+K. Volume 200
+L. Volume 500
+M. Volume 1000
+N. Stop Live
+O. Incoming VC audio browser में सुनने की test
+P. Browser reconnect
+Q. `.play`
+R. `.vcstop`
+S. `.vcleave`
+T. Existing hosting commands
+
+हर test का वास्तविक result report करो।
+
+IMPORTANT:
+
+किसी feature को केवल इसलिए "complete" मत बोलना क्योंकि UI button काम कर रहा है।
+
+Audio वास्तव में Telegram Voice Chat तक पहुँचना चाहिए।
+
+अगर किसी हिस्से की limitation current PyTgCalls/ntgcalls API के कारण है, तो उसे साफ-साफ बताओ।
+
+पहले existing implementation का backup/checkpoint बनाओ।
+
+काम पूरा होने के बाद:
+- बदली हुई files बताओ
+- नई dependencies बताओ
+- Replit deployment/configuration changes बताओ
+- कौन-कौन से tests pass हुए बताओ
+- कौन सी limitations बची हैं बताओ
+- Existing commands सुरक्षित हैं या नहीं बताओ
+
+और सबसे महत्वपूर्ण: existing working project को break मत करना।

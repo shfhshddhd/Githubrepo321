@@ -1,0 +1,173 @@
+I want you to add a complete Telegram Voice Chat audio playback system to my existing Telegram userbot.
+
+IMPORTANT:
+- Do NOT remove, break, or rewrite any existing features, commands, plugins, database logic, or AI features.
+- Inspect the existing project first and integrate this feature into the current architecture.
+- Reuse the existing Telegram userbot session and existing dependencies wherever possible.
+- Keep the implementation modular and production-ready.
+
+VOICE CHAT MANAGEMENT:
+
+1. /vcjoin <group_id_or_username>
+- Join the Telegram Group Voice Chat using my existing Telegram userbot account.
+- Example:
+  /vcjoin -1001234567890
+  or
+  /vcjoin @groupusername
+- Before joining, check whether a Voice Chat is currently active in that group.
+- If there is NO active Voice Chat, do not crash. Reply with a clear message such as:
+  "❌ No active Voice Chat found in this group. Please start a Voice Chat first, then run /vcjoin again."
+- If the userbot is already connected to another Voice Chat, do NOT silently disconnect or join another one.
+- Reply clearly:
+  "⚠️ Already connected to a Voice Chat in another group. Use /vcleave first or /vcstatus to see the current connection."
+- Only allow ONE active Voice Chat connection at a time.
+- After successfully joining, show the group name and connection status.
+
+2. /vcstatus
+- Show whether the userbot is currently connected to a Voice Chat.
+- If connected, show the group name/ID.
+- If not connected, clearly say:
+  "❌ Not connected to any Voice Chat."
+
+3. /vcleave
+- Leave the currently connected Voice Chat.
+- If no Voice Chat is active, return a clear message instead of throwing an error.
+
+4. /record
+- This command should work only when the userbot is connected to an active Voice Chat.
+- When /record is used, reply:
+  "🎙️ Send me a voice message or audio file."
+- Wait for the next voice message/audio file sent by the authorized owner.
+- Download the received audio automatically.
+- Support Telegram voice messages and common audio formats.
+
+AUDIO PROCESSING:
+
+Before playing the recording into the Voice Chat, process the audio to make it sound:
+- clean
+- clear
+- louder
+- more consistent
+- professional
+
+Use safe real-time-quality audio processing such as:
+- loudness normalization
+- moderate gain boost
+- compressor
+- limiter
+- optional light noise reduction if appropriate
+
+IMPORTANT:
+- Do NOT excessively amplify the audio.
+- Prevent clipping and severe distortion.
+- The final result should sound noticeably louder and clearer, but NOT broken, distorted, or painfully loud.
+- Preserve the original voice quality as much as possible.
+
+PLAYBACK:
+
+After processing:
+- Automatically play/stream the processed recording into the currently connected Telegram Voice Chat.
+- Playback should start automatically without requiring another command.
+- The audio must be sent through the existing Telegram userbot Voice Chat connection.
+- Use an appropriate Telegram voice-chat library already present in the project, or add a compatible library only if necessary.
+- Do not send the processed file back to the group as a normal Telegram message unless explicitly requested.
+- The main purpose is to PLAY the audio inside the active Voice Chat.
+
+PLAYBACK CONTROLS:
+
+Add:
+- /pause — pause current playback
+- /resume — resume playback
+- /skip — stop current audio and clear it
+- /stop — stop current playback
+- /nowplaying — show the currently playing audio
+- /volume <0-100> — control playback volume safely
+
+QUEUE:
+
+Implement a simple per-session playback queue:
+- If another recording is already playing and a new recording is sent, add it to the queue.
+- Play queued recordings automatically in order.
+- /queue should show the current queue.
+- /clearqueue should clear waiting recordings without unnecessarily disconnecting from the Voice Chat.
+
+ERROR HANDLING:
+
+Handle these situations gracefully:
+- No active Voice Chat
+- Userbot not connected
+- Invalid group ID/username
+- Bot/userbot lacks permission
+- Voice Chat connection failure
+- Unsupported audio format
+- Download failure
+- FFmpeg failure
+- Playback failure
+- User sends something other than an audio/voice message after /record
+- Another recording is already processing
+
+Never crash the entire bot because of a Voice Chat error.
+
+SECURITY:
+
+- Only the authorized owner of the userbot should be able to control /vcjoin, /vcleave, /record, /pause, /resume, /skip, /stop, /volume, /queue, and /clearqueue.
+- Do not expose Telegram API credentials, session strings, bot tokens, MongoDB credentials, or environment variables.
+- Use existing environment variables/secrets already configured in Replit.
+
+COMMAND SUMMARY:
+
+/vcjoin <group_id_or_username> = join an active Voice Chat
+/vcstatus = show current Voice Chat connection
+/vcleave = leave Voice Chat
+/record = ask for an audio/voice recording and play it in VC
+/pause = pause playback
+/resume = resume playback
+/skip = skip current recording
+/stop = stop playback
+/nowplaying = show current recording
+/volume <0-100> = change playback volume
+/queue = show queued recordings
+/clearqueue = clear the queue
+
+IMPORTANT ARCHITECTURE REQUIREMENT:
+
+Use only ONE active Voice Chat connection at a time for this userbot account.
+
+If /vcjoin is called while already connected to another Voice Chat:
+- Do not automatically switch.
+- Tell the owner which group is currently active.
+- Ask them to use /vcleave first.
+
+If the requested group's Voice Chat is not active:
+- Do not crash.
+- Clearly tell the owner that the Voice Chat must be started first.
+
+After implementing everything:
+1. Check the entire existing project for compatibility.
+2. Install only required dependencies.
+3. Make sure FFmpeg is available/configured for audio processing.
+4. Do not overwrite existing functionality.
+5. Run syntax/import checks.
+6. Test the Voice Chat command flow as far as possible.
+7. Fix any errors you find.
+8. Give me a concise summary of which files were changed and how to use the new commands.
+
+The final system should allow this workflow:
+
+/vcjoin @mygroup
+        ↓
+Userbot joins the active Voice Chat
+        ↓
+/record
+        ↓
+"🎙️ Send recording"
+        ↓
+I send a voice message/audio file
+        ↓
+Download
+        ↓
+Clean + normalize + moderate loudness boost + compressor + limiter
+        ↓
+Automatically play processed audio in the connected Voice Chat
+        ↓
+When finished, automatically play the next queued recording if available.

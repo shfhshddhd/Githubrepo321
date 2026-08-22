@@ -1,0 +1,67 @@
+Phase 3 शुरू करो — Real Live Microphone → Telegram Voice Chat
+Phase 1 की existing implementation को बिल्कुल मत तोड़ो। पहले current Git/checkpoint को preserve करो।
+अब मेरा मुख्य feature implement करो:
+Telegram Mini App → Phone Microphone → WebSocket → Python Backend → PyTgCalls → Hosted Userbot → Telegram Voice Chat
+Requirements:
+Mini App में microphone permission माँगो।
+Mobile browser से वास्तविक live microphone audio capture करो।
+Low-latency audio transport के लिए WebSocket इस्तेमाल करो।
+Per-user authenticated WebSocket connection बनाओ।
+केवल उसी verified Telegram user के hosted UserbotClient/VoiceChatManager को audio भेजो।
+Audio को PyTgCalls 2.3.3 / ntgcalls 2.2.5 के वास्तविक installed APIs के अनुसार Telegram VC में भेजो।
+कोई fake/demo audio या simulated success मत बनाओ।
+Existing .vcjoin को reuse करो। अगर user VC में connected नहीं है तो Mini App में स्पष्ट error दिखाओ।
+Existing .play, .vcstop, .vcleave, .volume और बाकी commands को break मत करो।
+Live Volume
+Existing .volume system को live microphone pipeline से connect करो।
+Desired semantics:
+.volume 100 = 1x
+.volume 200 = 2x
+.volume 500 = 5x
+.volume 1000 = 10x
+और बड़ी values भी accept करो, लेकिन audio library की वास्तविक numeric limitations का सम्मान करो।
+Noise reduction, AI enhancement, voice changer, pitch shifting या unnecessary filtering मत लगाओ। केवल required resampling/channel conversion और gain processing करो।
+Mini App में भी live volume control दो और existing .volume state के साथ synchronize करो।
+Mic controls
+Mini App में:
+Mic ON/OFF
+Start Live
+Stop Live
+Push-to-Talk
+Volume/Gain
+Connection status
+VC status
+होना चाहिए।
+Audio architecture
+पहले installed PyTgCalls version की actual API inspect करो और यह verify करो कि browser से आने वाले continuous audio को किस supported MediaStream/source mechanism से Telegram VC में भेजा जा सकता है।
+अगर direct byte injection supported नहीं है तो documented/actual supported source mechanism के आधार पर FFmpeg pipe, FIFO या equivalent audio bridge बनाओ।
+Browser से आने वाले audio को bounded queue में रखो। Backpressure और disconnect cleanup implement करो।
+WebSocket disconnect होने पर:
+audio producer बंद हो
+queue साफ हो
+FFmpeg/pipe safely terminate हो
+Telegram VC connection unnecessarily disconnect न हो
+.play compatibility
+Existing .play और live mic को simultaneously चलाना current PyTgCalls API से reliably possible है या नहीं, पहले verify करो।
+अगर mixer की जरूरत है तो बिना existing playback तोड़े architecture बनाओ।
+अगर अभी safely possible नहीं है, तो पहले version में .play active होने पर Live Mic शुरू करने से रोक दो और Mini App में स्पष्ट message दिखाओ:
+पहले current playback रोकें, फिर Live Mic शुरू करें।
+Testing
+Implementation के बाद वास्तविक test करो:
+Mini App खोलना
+Telegram authentication
+Hosted user verification
+.vcjoin
+Mini App से Mic permission
+Start Live
+वास्तविक आवाज़ Telegram VC तक पहुँचना
+Mic OFF/ON
+Push-to-Talk
+Volume 100/200/500/1000
+Stop Live
+.play
+.vcstop
+.vcleave
+हर test का वास्तविक result बताओ।
+महत्वपूर्ण: अगर PyTgCalls की current version में microphone-to-VC का कोई हिस्सा public API से वास्तव में संभव नहीं है, तो implementation को fake मत करो। Exact limitation बताओ और सबसे practical supported workaround implement करो।
+Phase 3 complete होने के बाद ही incoming VC audio/browser listening पर जाओ।

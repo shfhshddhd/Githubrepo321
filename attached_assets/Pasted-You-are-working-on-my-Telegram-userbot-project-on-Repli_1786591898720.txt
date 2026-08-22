@@ -1,0 +1,28 @@
+You are working on my Telegram userbot project on Replit.
+
+CONTEXT:
+- The /start menu of the control bot is FINAL and CORRECT — do NOT change it. It shows only: Account (/host, /unhost, /cancel), General (/start, /help, /allcommands), and HOSTED USERBOT COMMANDS section (.help, .help <plugin>, .plugins, .findplugin, .helpstats, .alive / .ping).
+- My userbot loads plugins from telegram_userbot/plugins/ and supports dot commands.
+- I recently added a self-update plugin (telegram_userbot/plugins/self_update.py — find it if path differs) with owner-only commands: .updatetohidbot <prompt>, .restorebackup [timestamp], .memory, .addopenrouterkey <API_KEY>, .addclaudekey <API_KEY>, .listkeys.
+- PROBLEM: these commands load at startup but do NOT appear in .help / .plugins listing, while other plugins (e.g. "📦 Control_Commands [22]") do appear.
+- Also, the plugin list in .help has NO numbering — I want 1., 2., 3., ... before each plugin line.
+
+GOAL — EVERY command must live in a plugin:
+
+1. FIND the help/plugins listing generator (search for the "Help Menu" header, the "plugins · commands" count line, and where lines like "👑 Admin [8]" are produced). Compare what metadata/attributes the generator reads (module docstring, __plugin_name__, __description__, __help__, etc.) in Control_Commands.py vs self_update.py. Fix self_update.py so it appears in the listing with name "Self_Update", description "Self-update, restore, memory and multi-provider key management", and correct command count (6 commands). Ensure .help Self_Update shows the detailed command list, and .findplugin / .helpstats work for it.
+
+2. AUDIT: walk through EVERY command in the whole project — both control-bot slash commands (/start, /help, /allcommands, /host, /unhost, /cancel, /targetadd, /targetremove, /targetlist, /targetremoveall, /boton, /botoff, /aimodeon, /aimodeoff, /addkey, /listkeys, /delkey, /switchkey, /addopenrouterkey, /addclaudekey) AND the dot commands (.help, .plugins, .findplugin, .helpstats, .alive, .ping, .updatetohidbot, .restorebackup, .memory, .addkey, .listkeys, .delkey, .switchkey, .addopenrouterkey, .addclaudekey, plus the target/AI-mode/bridge equivalents: .targetadd, .targetremove, .targetlist, .targetremoveall, .boton, .botoff, .aimodeon, .aimodeoff).
+   - For every such command, confirm it is registered inside a plugin file in telegram_userbot/plugins/ so it appears in .plugins and .help <plugin>.
+   - If ANY command exists only in the control bot and has no plugin counterpart, ADD it as a plugin command in the appropriate existing plugin (or a new plugin) following the existing pattern, reusing the same storage. Owner-only protection must remain on sensitive commands.
+   - Do NOT add duplicate handlers. Do NOT change any existing behavior.
+
+3. ADD NUMBERING to the plugin listing: each plugin line must be prefixed with position number exactly like:
+   1.👑 Admin [8] — Admin commands...
+   2.😴 Afk [5] — Advanced AFK system...
+   3.🤖 Ai_Setup [3] — AI Configuration Manager
+   ...sequential up to the last plugin. The header must show correct totals after Self_Update is included (should be at least "100 plugins"). Apply the same numbering to .plugins output if it uses a similar list.
+
+4. VERIFY:
+   - .help output is not truncated — split into multiple messages via the existing send/edit helper if needed.
+   - /start remains EXACTLY as it is now — do not add or remove anything from it.
+   - After finishing, give me: files modified, a before/after example of the first 5 plugin lines including the new Self_Update line, a list of any commands that were added as plugins during the audit, and test commands (.plugins, .help, .help Self_Update).

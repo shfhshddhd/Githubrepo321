@@ -1,0 +1,74 @@
+You are working on my Telegram userbot project running on Replit. The project has TWO parts:
+
+1. CONTROL BOT — responds to slash commands (/start, /help, /allcommands, /host, /unhost, /cancel, /targetadd, /boton, /aimodeon, /addkey, etc.)
+2. HOSTED USERBOT — after /host succeeds, my Telegram account loads plugins that respond to dot commands (.help, .plugins, .alive, .ping, .findplugin, .helpstats)
+
+I need THREE changes. Inspect the existing code BEFORE editing and match the existing coding style.
+
+═══════════════════════════════
+CHANGE 1 — Simplify the /start menu
+═══════════════════════════════
+Currently /start shows a long menu with these sections: QUICK START, MAIN COMMANDS (Account, Targets and bridge, AI mode, Gemini keys), General, HOSTED USERBOT COMMANDS.
+
+I want /start to show ONLY this simplified layout:
+
+👋 Welcome message (keep the bot name line)
+
+📋 MAIN COMMANDS
+🔐 Account
+/host — Connect and host your Telegram account (OTP/2FA required)
+/unhost — Remove your hosted account and stop the userbot
+/cancel — Cancel an in-progress hosting operation
+
+ℹ️ General
+/start — Show this main menu
+/help — Show this main menu
+/allcommands — Show this complete command list
+
+━━━━━━━━━━━━━━━━━━━━━━
+🧩 HOSTED USERBOT COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━
+After /host succeeds, use these commands from your hosted account:
+
+.help — all loaded plugins and command counts
+.help <plugin> — detailed commands for one plugin
+.plugins — list all plugin modules
+.findplugin <word> — search for a plugin
+.helpstats — show loaded plugin statistics
+.alive / .ping — check userbot status
+
+The complete plugin command list is available through .help.
+
+Rules:
+- REMOVE the QUICK START section and the Targets/AI mode/Gemini keys sections from /start output.
+- MOVE the full menu (including Targets and bridge, AI mode, Gemini keys sections) to /allcommands — /allcommands must show the COMPLETE command list.
+- Keep /help as an alias of /start.
+- Only edit the menu text/handler, do not change command logic.
+
+═══════════════════════════════
+CHANGE 2 — Make .help show ALL plugins and commands
+═══════════════════════════════
+When I send .help from my hosted account after hosting, it must show:
+- every loaded plugin module with its command count, AND
+- a readable list of every available dot command with a short description (including the custom plugin commands: .targetadd, .targetremove, .targetlist, .targetremoveall, .boton, .botoff, .aimodeon, .aimodeoff, .addkey, .listkeys, .delkey, .switchkey, .ping, .alive, .findplugin, .helpstats).
+- The output must NOT be truncated — if it is too long for one message, split it into multiple messages using the framework's edit/send helper.
+- .help <pluginname> must still show the detailed command list for that one plugin.
+
+═══════════════════════════════
+CHANGE 3 — Fix .ping and .alive command error
+═══════════════════════════════
+When I send .ping or .alive from my hosted account, I get a "command error". Find and fix the bug. Check:
+- the plugin registration (is the plugin file loaded and listed in .plugins?)
+- the handler function signature (must match the framework's expected pattern, e.g. async def alive(client, message) with the correct decorator)
+- missing imports (time, datetime, platform, etc.)
+- any NameError/AttributeError inside the handler
+- duplicate handler names or wrong command names
+After the fix, .ping and .alive must reply with a proper status message (alive status, uptime, Python version, Telegram version if available) with NO errors.
+
+═══════════════════════════════
+FINAL REQUIREMENTS
+═══════════════════════════════
+1. Do NOT break any existing slash commands or other plugins.
+2. Do NOT create duplicate handlers.
+3. Keep owner-only protection on sensitive commands.
+4. After finishing, give me a summary: files modified, what was changed in each, and exact restart steps for Replit.

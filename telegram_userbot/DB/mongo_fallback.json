@@ -1,0 +1,17 @@
+{
+  "users": [
+    {
+      "user_id": 8732266416,
+      "session_string": "1BVtsOKgBuxLRRUSnElQ2chr8ULStPzlpWw4gzinb3TuIKIM8mEmq6b_8-f5saSo1vCsS0u8xUH_OWkB6sVZs9F1BPhVEdo-9ZKs69ZkElTF2cWv2Zu5_BpfYTksU4iEyDzl1d7r5FZYM2Rj7F8_SAM6dT-C-t-KsqZAggKUWc92-YWvJsYtqBlVhBGb8SxMUatHL0T4YP6DxUHSkfJw6ZZwvPnOOMOAqbF_KxBXn4-hBWV0DV65KpQmzdGtY8jB4SYtJFCJB2lAmOyzw4Hxn7y4Mh5h6q8K-jhy3G-IMimEz5PK0UlaWFpv3JmqjA42Bj_7EzXlMI3WsdyVfF3xiNQYCO2X-C-k=",
+      "active": true,
+      "bot_enabled": false,
+      "ai_mode": true
+    },
+    {
+      "user_id": 1229452439,
+      "session_string": "1BVtsOKwBuyspc6QEy2QyW1Anu9kvY7pb1dWmGC4ogvupHwalbAxreKzBcc1L-fejGggoz47S4PrQ3VvWWCX2zJK0pU49Iej9X78IYdsezIynYCu89Chm13hwcHB9W0p9kKj0h68KPSuw6D_AGce6n2ueqRlf-9HMkaURUo_kymU9mjv5_gAu3mmBRZ4_wSiPtWdkBtp9-46VIJep_dN_aPOOfWRSYeIq7__RheHmt8z1EzFMoX0-iPGbczVGC8EHg8Yd2HKJy2vWByfwgqdaNQRWzngKbkAuOL-AVRDvFTNYVvskzFzC7H0sCJxz2gE1HFhdxD2sHVnh1a14YHCY1cz79b8vTIg=",
+      "active": true
+    }
+  ],
+  "target_mappings": []
+}

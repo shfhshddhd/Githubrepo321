@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>Live VC</title>
+    <link rel="stylesheet" href="/mini-app/static/styles.css" />
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div class="eyebrow">HOSTED TELEGRAM</div>
+        <h1>Live VC</h1>
+        <p class="lede">Your private control surface for the connected Voice Chat.</p>
+      </header>
+
+      <section id="notice" class="notice" role="status" aria-live="polite">
+        Authenticating with Telegram…
+      </section>
+
+      <section class="status-grid" aria-label="Connection status">
+        <article class="status-card">
+          <span class="label">Account</span>
+          <strong id="account-status">Checking</strong>
+          <span id="account-detail" class="detail">Waiting for Telegram</span>
+        </article>
+        <article class="status-card">
+          <span class="label">Voice Chat</span>
+          <strong id="vc-status">Checking</strong>
+          <span id="vc-detail" class="detail">Waiting for account</span>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <span class="eyebrow">PHASE 1</span>
+            <h2>Connection overview</h2>
+          </div>
+          <span id="refresh-state" class="pulse" aria-hidden="true"></span>
+        </div>
+        <dl class="facts">
+          <div><dt>Live audio</dt><dd>Coming next</dd></div>
+          <div><dt>Microphone</dt><dd>Not connected</dd></div>
+          <div><dt>Incoming audio</dt><dd>Not connected</dd></div>
+        </dl>
+        <p class="muted">Use <code>.vcjoin</code> from the control bot first. This screen currently reports the secure account and Voice Chat connection only.</p>
+      </section>
+
+      <button id="retry" class="button" type="button" hidden>Try again</button>
+    </main>
+    <script src="/mini-app/static/app.js"></script>
+  </body>
+</html>

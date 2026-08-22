@@ -1,0 +1,87 @@
+TUM EK SENIOR PYTHON DEVELOPER HO. Is Replit workspace me ek Telegram multi-user userbot project hai. Mera kaam: doosre GitHub repo ke plugin system ko is repo me merge karna, bina existing code ko toda. Neeche poori spec hai — step by step follow karo.
+
+## SOURCES
+1. PLUGIN SOURCE (read-only): https://github.com/infinitylx760-design/R00t_Crimson (branch: `elite`) — isme ~90 plugins hain. Clone karo: `git clone --depth 1 -b elite https://github.com/infinitylx760-design/R00t_Crimson.git /tmp/r00t`
+2. TARGET (ye workspace): Tohid0.2 — already Replit pe deploy hai. Iska run command `.replit` me hai: `.pythonlibs/bin/python telegram_userbot/main.py`. YE COMMAND AUR STRUCTURE MAT TODNA.
+
+## TARGET ARCHITECTURE (pehle ye files padho)
+- `telegram_userbot/main.py` — PTB (python-telegram-bot) entry point. MAT CHHEDO.
+- `telegram_userbot/config.py` — env vars (BOT_TOKEN, API_ID, API_HASH, MONGO_URI, GEMINI_API_KEY).
+- `telegram_userbot/userbot/manager.py` — har user ka Telethon client manage karta hai. MAT CHHEDO (sirf client.py me chhota patch allowed hai).
+- `telegram_userbot/userbot/client.py` — `UserbotClient` class, har hosted user ke liye ek Telethon client. Iske `start()` me plugin layer ka call add karna hai (detail neeche).
+- `telegram_userbot/database/mongo.py` — sessions MongoDB me store hote hain.
+- `telegram_userbot/bot/` — PTB handlers (/host etc). MAT CHHEDO.
+- Ye project multi-user hai: har user ka apna Telethon session hai. Plugin commands har hosted account ke apne Telethon client par register honi chahiye.
+
+## SOURCE ARCHITECTURE (repo 1 — CipherElite)
+- Standalone single-account Telethon userbot.
+- `plugins/*.py` — har plugin me `init(client_instance)` aur `async def register_commands()` hota hai.
+- Handlers register hote hain: `@CipherElite.on(events.NewMessage(pattern=r"\.command..."))` — `CipherElite` ek GLOBAL variable hai jo client ko point karta hai (`utils/utils.py` me `init_client()` se set hota hai).
+- Access control: `@rishabh()` decorator (`utils/decorators.py`) — owner/sudo check.
+- Help menu: `plugins/bot.py` me `CMD_LIST` dict aur `add_handler(plugin_name, commands, description)` — har plugin `init()` me ise call karta hai.
+- Plugins import karte hain: `from utils.utils import CipherElite`, `from utils.decorators import rishabh`, `from plugins.bot import add_handler, CMD_LIST, bot`, `from config.config import Config`, kuch `from DB.database import ...`.
+- `vars.py`, `DB/` (JSON database — warn counts etc.), `utils/helpers.py`, `utils/help_ui.py`, `utils/thanos.py` bhi hain.
+
+## GOAL
+Repo 1 ke saare userbot plugins (`.command` wale, ~90 files) ko target repo me lao taaki har hosted user apne account se `.command` chala sake. Existing bridge/AI features 100% kaam karte rahein.
+
+## HARD RULES — YE IDENTIFIERS RENAME KABHI MAT KARNA
+Ye internal names hain jinhe plugin files refer karti hain; rename kiye to ~90 plugins toot jayengi:
+- `CipherElite` (global variable in utils/utils.py)
+- `rishabh` (decorator name)
+- `Config` (class)
+- `CMD_LIST`
+- `ELITE_SESSION`
+
+Sirf unki VALUES / user-visible STRINGS me branding badalni hai (neeche branding section). Naam bilkul same rakho.
+
+## BRANDING (bot ka naya naam: "FLEX FUCKER USERBOT")
+- User-visible strings me: "Cipher Elite", "CipherElite", standalone "Elite" → "FLEX FUCKER USERBOT" (sirf string literals aur comments me; identifiers kabhi nahi).
+- Default values: `BOT_NAME = "FLEX FUCKER USERBOT"`, `ALIVE_NAME = "FLEX FUCKER USERBOT"`.
+- Original links (t.me/THANOS_PRO, t.me/cipherelite_support, t.me/thanosprosss, t.me/thanosceo, github.com/rishabhops/CipherElite) user-visible dikhe to neutral/remove karo (support buttons hata do).
+- Rebranding ke liye `tokenize` based script banao (sirf STRING/COMMENT tokens me replace, identifiers untouched) — ya careful find-replace karo.
+
+## IMPLEMENTATION STEPS
+1. Pehle git commit karke backup banao.
+2. Copy karo (target repo me):
+   - repo1/plugins → telegram_userbot/plugins (lekin plugins/bot.py ko DELETE karke naya likhna hai — step 6 dekho)
+   - repo1/utils → telegram_userbot/utils (utils/thanos.py ko simple stub se replace karo: `def thanos_protect(s): return s`)
+   - repo1/DB → telegram_userbot/DB
+   - repo1/vars.py → telegram_userbot/vars.py
+   - repo1/requirements.txt → flex-requirements.txt (install ke liye)
+3. `telegram_userbot/config.py` me APPEND karo (existing vars mat hatao):
+   - `Config` class: API_ID, API_HASH, BOT_TOKEN, MONGO_URI, GEMINI_API_KEY, BOT_NAME="FLEX FUCKER USERBOT", VERSION, BRANCH, UPSTREAM_REPO (target repo ka URL), OWNER_ID (env se), SUDO_USERS (env se), LOG_CHAT_ID (env se), STRING_SESSION (env ELITE_SESSION se alias — repo2 use nahi karta, sirf compatibility), DEFAULT_ALIVE_PIC / DEFAULT_PING_PIC / DEFAULT_PMPERMIT_PIC / ALIVE_NAME (env se, branded defaults).
+   - Plugin ka import `from config.config import Config` resolve karne ke liye: loader me `sys.modules["config.config"] = <existing config module>` alias set karo. File-system folder mat banao jo existing `config.py` ko shadow kare.
+4. Naya `telegram_userbot/plugin_loader.py` banao:
+   - `async def load_for(userbot)` — ek UserbotClient instance leta hai.
+   - Per-user fresh module loading, `asyncio.Lock` ke saath, taaki har user ke client par handlers register hon aur CMD_LIST per-user rahe.
+   - Order: (a) `plugins/bot.py` ko fresh import karke `sys.modules["plugins.bot"]` set karo (CMD_LIST fresh), (b) `utils.utils.init_client(client)` call karke CipherElite global ko is user ke client par point karo, (c) baaki saare `telegram_userbot/plugins/*.py` load karo (`bot.py` aur `__init__` chhod kar): `mod.init(client)` + `await mod.register_commands()` agar exist kare, (d) error handling: ek plugin fail ho to sirf wo skip ho, (e) cleanup: loaded modules ko namespace se hatao taaki agli user ke liye fresh ho.
+   - sys.modules me alias: "config.config" → existing config module (Config class ke saath).
+5. `telegram_userbot/userbot/client.py` me chhota patch: `start()` me client start hone ke baad `from plugin_loader import load_for; await load_for(self)` — try/except me wrap karo (fail ho to bhi bridge/AI chalte rahein).
+6. `telegram_userbot/plugins/bot.py` NAYA likho (repo1 wala mat use karo — usme inline assistant bot hai jo PTB bot se conflict karega):
+   - `CMD_LIST = {}` global, `add_handler(plugin_name, commands, description)`.
+   - `bot = None` (inline assistant disabled — BOT_TOKEN PTB ke paas hai).
+   - `init_bot(client)` → return None.
+   - `.help` aur `.help <plugin>` commands: CipherElite.on + rishabh decorator se, DIRECT REPLY (inline nahi), "FLEX FUCKER USERBOT" branding, 4000-char chunking, HTML parse_mode, help_ui.esc se escaping.
+7. Inline plugins ko direct-reply me convert karo (jaise plugins/alive.py, ping): jinme `bot.inline_query(...)` / `.click(...)` use hota hai, unme `if bot is not None:` guard + fallback `event.reply(...)` lagao. Inline unavailable hone par direct reply aaye.
+8. Dependencies: `flex-requirements.txt` se install karo. Version conflict ho to essential packages install karo (telethon, python-dotenv, aiohttp, requests, pillow, beautifulsoup4, yt-dlp, google-generativeai, openai, speedtest-cli, pyfiglet, gitpython, motor, pymongo, rich). Media plugins ke liye `.replit` ke nix packages me `ffmpeg` add karo (`openssl` ke saath) — .replit ka run command mat badlo.
+9. Conflict check: repo1 ka `scan_conflicts.py` copy karke chalao (duplicate command patterns pakadne ke liye). Existing bridge ke Telethon handlers se clash ho to report karo.
+10. Syntax check: `python -m compileall telegram_userbot` chalao.
+
+## TESTING (restart ke baad verify karo)
+- Logs me har user ke liye "N plugins loaded" dikhe (N ≈ 80-90).
+- `.help` → "FLEX FUCKER USERBOT — Help Menu" aaye; koi "Cipher"/"Elite" visible na ho.
+- `.alive`, `.ping`, aur 3-4 commands (`.ban`, `.warn`, `.reverse`) test karo.
+- Bridge/AI feature ab bhi chal raha ho.
+- `grep -rn "CipherElite\|Cipher Elite" telegram_userbot/plugins` → sirf import statements (identifiers) bache; koi visible branding nahi.
+- Naya session add karne ka flow (/host) ab bhi kaam karta ho.
+
+## MAT KARNA
+- `telegram_userbot/main.py`, `manager.py`, `database/`, `bot/` ke logic mat badlo (sirf config.py me append + client.py me chhota patch allowed).
+- `.replit` ka run command mat badlo.
+- Upar wali identifier list rename mat karo.
+- Inline assistant bot mat banayo (BOT_TOKEN conflict).
+- `bot_plugins/` folder (adult_mode, assistant.py, whisper_bot) abhi port mat karo — unhe PTB handlers me rewrite karna alag kaam hai.
+
+## REPORT
+Khatam hone par mujhe batao: (1) kitne plugins load hue, (2) kaunsi plugins fail/skip hui aur kyun, (3) kaunse command patterns clash hue, (4) branding check ka result, (5) existing code me jo bhi change kiya uski list.

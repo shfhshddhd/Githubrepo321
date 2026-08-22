@@ -1,0 +1,421 @@
+Modify my existing Telegram bot's update/coding system. Do not remove or break any existing features, commands, plugins, database logic, or current ".updatetohidbot" behavior unless absolutely necessary. First inspect the existing codebase and understand how the current ".updatetohidbot <prompt>" command works, then implement the following system cleanly using the project's existing architecture.
+
+1. COMMANDS
+
+Keep the existing command:
+
+".updatetohidbot <prompt>"
+
+Also add these two provider-specific commands:
+
+".updategemini <prompt>"
+
+and
+
+".updateopenrouter <prompt>"
+
+IMPORTANT: These are the exact command formats. There must be NO space inside the command name.
+
+Examples:
+
+".updategemini add a /ping command to the bot"
+
+This must use ONLY the configured Gemini API keys.
+
+Example:
+
+".updateopenrouter add a /ping command to the bot"
+
+This must use ONLY the configured OpenRouter API keys.
+
+Do NOT automatically switch from Gemini to OpenRouter when ".updategemini" is selected.
+
+Do NOT automatically switch from OpenRouter to Gemini when ".updateopenrouter" is selected.
+
+Each provider must have its own completely separate fallback/rotation system.
+
+2. GEMINI API KEY ROTATION/FALLBACK
+
+I may have multiple Gemini API keys configured.
+
+For ".updategemini", use the Gemini keys in order:
+
+Gemini Key 1 → Gemini Key 2 → Gemini Key 3 → Gemini Key 4 → Gemini Key 5 → etc.
+
+If the currently selected Gemini API key reaches its quota/rate limit or returns a provider error indicating that the key cannot currently be used, automatically move to the next configured Gemini key.
+
+Continue until a usable Gemini key is found.
+
+IMPORTANT:
+
+- Never switch to OpenRouter during ".updategemini".
+- Never switch to another provider.
+- Only rotate through Gemini keys.
+- Keep trying the configured Gemini keys in their configured order.
+- Do not unnecessarily switch keys if the current key is working.
+- Do not treat every normal coding error as an API quota error.
+- Detect quota/rate-limit/provider errors separately from coding/project errors.
+
+If all Gemini keys are unavailable because of quota/rate limits or provider-side temporary restrictions, stop the update process and send a clear Telegram message saying that all configured Gemini API keys are currently unavailable.
+
+The message should include which keys were attempted and the reason when safely available, but never expose the actual API key values.
+
+3. OPENROUTER API KEY ROTATION/FALLBACK
+
+Implement exactly the same system for OpenRouter.
+
+For ".updateopenrouter", use:
+
+OpenRouter Key 1 → OpenRouter Key 2 → OpenRouter Key 3 → OpenRouter Key 4 → etc.
+
+If one OpenRouter API key reaches its limit or becomes unavailable, automatically move to the next configured OpenRouter key.
+
+IMPORTANT:
+
+- Never switch to Gemini during ".updateopenrouter".
+- Only use OpenRouter keys.
+- Do not expose API keys in Telegram messages or logs.
+
+If every configured OpenRouter key is unavailable, stop the process and notify me in Telegram.
+
+4. START AGAIN FROM THE FIRST KEY
+
+When a new update command starts, begin checking from Key 1.
+
+If Key 1 is unavailable, move to Key 2, then Key 3, etc.
+
+If all keys are unavailable, stop.
+
+When the API quota becomes available again later, the next new update command should again start from Key 1.
+
+Do not permanently blacklist a key.
+
+You may temporarily remember a key's recent failure during the current update process to avoid repeatedly retrying the same failed key.
+
+5. TELEGRAM LIVE PROGRESS UPDATES
+
+This is very important.
+
+While the AI is working on the requested coding task, send live progress messages to the same Telegram chat where I started the update command.
+
+I want to see what the AI is doing, similar to Replit AI's progress/status messages.
+
+For example, send updates such as:
+
+- Update request received.
+- Selected provider: Gemini/OpenRouter.
+- Checking API key availability.
+- Gemini Key 1 is being used.
+- Reading the project structure.
+- Analyzing the existing code.
+- Identifying the files that need changes.
+- Planning the implementation.
+- Editing files.
+- Adding the requested feature.
+- Checking existing commands.
+- Checking for syntax errors.
+- Running tests/checks.
+- A problem was detected.
+- Investigating the problem.
+- Fixing the problem.
+- Running the checks again.
+- Restarting the bot/workflow if required.
+- Checking whether the bot starts successfully.
+- Saving all modified files.
+- Preparing the changes for commit.
+- Committing the changes.
+- Pushing/syncing the changes if the existing project workflow supports it.
+- Verifying the final result.
+- Update completed successfully.
+
+Do not spam hundreds of Telegram messages.
+
+Instead, edit/update a single progress message when possible, or send reasonably spaced progress messages.
+
+The progress messages must be sent from the bot itself to the chat/user that initiated the update.
+
+6. SHOW ERRORS AND BUGS LIVE
+
+If the AI encounters a coding problem, syntax error, runtime error, missing dependency, incorrect import, broken command, or another project problem:
+
+1. Notify me in the Telegram chat.
+2. Explain briefly what problem was detected.
+3. Automatically attempt to fix it.
+4. Run/check the project again.
+5. If another error appears, repeat the diagnosis and fix process.
+6. Continue until the task is successfully completed or the system determines that it cannot safely continue.
+
+Example:
+
+"⚠️ Problem detected: command handler has an import error. I'm fixing it now..."
+
+Then:
+
+"🔧 Fix applied. Checking the project again..."
+
+Then:
+
+"✅ Error fixed. Running the final verification..."
+
+Do not claim success unless the implementation has actually been verified.
+
+7. AUTOMATIC BUG-FIXING LOOP
+
+After making the requested code changes, perform appropriate verification.
+
+If a bug/error is found:
+
+Analyze → Fix → Check/Test → Analyze again if necessary.
+
+Do not blindly keep retrying forever.
+
+Set a reasonable maximum number of automatic repair attempts to prevent infinite loops.
+
+If the maximum repair attempts are reached, stop and tell me:
+
+- what was changed,
+- what error remains,
+- what was already attempted,
+- and provide a Retry option and Cancel option.
+
+8. RETRY / CANCEL CONTROLS
+
+Whenever the update process stops because all provider keys are unavailable or the system cannot safely continue, provide Telegram buttons:
+
+[🔄 Retry] [❌ Cancel]
+
+If I press Retry:
+
+- restart the appropriate process,
+- use the same provider I originally selected,
+- start API-key checking again from Key 1,
+- do not switch providers.
+
+If I press Cancel:
+
+- immediately stop the current update process,
+- cancel pending retries where possible,
+- do not continue coding,
+- do not automatically restart the process.
+
+Send:
+
+"❌ Update process cancelled."
+
+If the process succeeds, Retry/Cancel controls should no longer be active for that operation.
+
+9. SUCCESSFUL COMPLETION MESSAGE
+
+When everything is successfully completed, send a clear final Telegram message such as:
+
+`✅ Update completed successfully.
+
+Provider: Gemini
+API key: Gemini Key 2
+
+Changes:
+• ...
+• ...
+• ...
+
+Verification: Passed
+Bot status: Running
+
+The new command/feature has been registered successfully.`
+
+Do not reveal the real API key.
+
+Only show something like:
+
+Gemini Key 2
+
+or a safely masked identifier.
+
+10. AUTOMATIC PLUGIN/COMMAND REGISTRATION
+
+If the requested update creates a new bot command or plugin, automatically register it in the project's existing plugin/command system.
+
+The new command should become available without requiring me to manually edit another file, if the current architecture supports automatic registration.
+
+Before registering it:
+
+- inspect how existing plugins/commands are registered,
+- follow the existing project architecture,
+- add the new command to the correct registry/module,
+- preserve existing plugin functionality,
+- avoid duplicate registration.
+
+After registration, verify that the new command can actually be discovered/loaded by the bot.
+
+Then report in Telegram:
+
+"✅ New command registered successfully and is now available."
+
+If automatic registration is not technically possible because of the existing architecture, do not fake success. Clearly tell me what prevented automatic registration and what file/step is required.
+
+11. SAVE, COMMIT AND SYNC CHANGES CORRECTLY
+
+A major issue currently exists where code changes may appear to be made but are not properly saved/committed.
+
+Fix this workflow.
+
+After coding:
+
+1. Save every modified file.
+2. Verify that the files actually contain the intended changes.
+3. Check the project status.
+4. Make sure all intended changed files are included.
+5. Create a proper Git commit if Git is already being used by the project.
+6. Push/sync the commit if the existing project configuration and permissions allow it.
+7. Verify that the commit/push actually succeeded.
+8. Do not falsely report "uploaded", "committed", or "pushed" if it failed.
+
+If Git push fails:
+
+- show the reason in Telegram,
+- attempt a safe fix if possible,
+- retry when appropriate,
+- otherwise report the exact failure.
+
+Never delete or overwrite unrelated user changes just to make Git clean.
+
+12. EXISTING ".updatetohidbot" COMMAND
+
+Do not break the existing:
+
+".updatetohidbot <prompt>"
+
+command.
+
+First inspect how it currently works.
+
+Preserve its existing behavior unless a change is required to integrate the new provider-selection system.
+
+If it currently has automatic fallback behavior, preserve it unless it conflicts with the new explicit provider commands.
+
+The important rules are:
+
+".updategemini ..." = Gemini only
+
+".updateopenrouter ..." = OpenRouter only
+
+".updatetohidbot ..." = preserve existing behavior.
+
+13. SECURITY
+
+Never send actual API keys into Telegram messages.
+
+Never print full API keys into logs.
+
+Never commit API keys into source code.
+
+Read API keys from the existing environment variables/secrets/configuration system.
+
+Do not expose passwords, tokens, MongoDB credentials, Telegram bot tokens, or other secrets.
+
+If multiple keys are configured using environment variables, support the project's existing naming convention. If necessary, inspect the existing environment/configuration code and adapt to it instead of inventing a conflicting system.
+
+14. CONCURRENCY PROTECTION
+
+Prevent multiple update processes from modifying the same project simultaneously.
+
+If an update is already running and another ".updategemini" or ".updateopenrouter" command is received, do not start a second coding process that could overwrite the first one.
+
+Instead send:
+
+"⚠️ An update is already running. Please wait for it to finish."
+
+If the architecture supports an explicit queue, it may queue requests safely, but never allow conflicting simultaneous file modifications.
+
+15. PROVIDER SELECTION MUST BE EXPLICIT
+
+The provider must be selected from the command.
+
+Examples:
+
+".updategemini add a new /ping command"
+
+→ Gemini only.
+
+".updateopenrouter add a new /ping command"
+
+→ OpenRouter only.
+
+If the provider name is missing or invalid, show correct usage:
+
+".updategemini <prompt>"
+
+".updateopenrouter <prompt>"
+
+Do not silently choose another provider.
+
+16. KEEP THE USER INFORMED
+
+The Telegram chat should make the entire process understandable without requiring me to open Replit.
+
+I should be able to see:
+
+- which provider is selected,
+- which key number is currently being used,
+- whether the AI is coding,
+- what files/features are being changed at a high level,
+- whether a bug occurred,
+- whether the bug is being fixed,
+- whether verification passed,
+- whether the bot restarted successfully,
+- whether Git save/commit/push succeeded,
+- whether plugin registration succeeded,
+- and whether the entire update succeeded or failed.
+
+Do not expose internal secrets or unnecessarily huge raw logs.
+
+17. FINAL IMPLEMENTATION REQUIREMENT
+
+Before making changes, inspect the entire existing update/coding flow and identify the correct files/modules.
+
+Implement this as a robust production-quality feature rather than a quick patch.
+
+Do not rewrite unrelated parts of the project.
+
+Do not remove existing functionality.
+
+Do not create duplicate handlers.
+
+Do not hardcode API keys.
+
+Do not claim an operation succeeded unless it has actually been verified.
+
+After implementation:
+
+1. Test ".updategemini".
+2. Test Gemini key fallback behavior using safe/mock failure handling where real quota exhaustion cannot be reproduced.
+3. Test ".updateopenrouter".
+4. Test OpenRouter key fallback behavior using safe/mock failure handling.
+5. Test all-keys-failed behavior.
+6. Test Retry.
+7. Test Cancel.
+8. Test error detection and automatic bug fixing.
+9. Test Git save/commit/push handling.
+10. Test plugin/command registration.
+11. Test that existing bot commands still work.
+12. Test that the bot starts successfully after the update.
+
+Finally, send a detailed Telegram success/failure report.
+
+MOST IMPORTANT:
+
+".updategemini" = GEMINI KEYS ONLY.
+
+".updateopenrouter" = OPENROUTER KEYS ONLY.
+
+Fallback is allowed only between keys belonging to the selected provider.
+
+NEVER automatically cross from Gemini to OpenRouter or from OpenRouter to Gemini.
+
+The exact commands must remain:
+
+".updatetohidbot <prompt>"
+".updategemini <prompt>"
+".updateopenrouter <prompt>"
+
+There must be NO spaces inside these command names.

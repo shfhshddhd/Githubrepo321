@@ -1,0 +1,12 @@
+{
+  "entry_file": "telegram_userbot/main.py",
+  "framework": "Telethon, python-telegram-bot",
+  "plugin_pattern": "telegram_userbot/plugins/*.py loaded per hosted Telethon client",
+  "storage_files": [
+    "memory/conversations.json",
+    "memory/keys_state.json",
+    "memory/learned_facts.json",
+    "memory/pending_updates.json",
+    "memory/updates_log.json"
+  ]
+}

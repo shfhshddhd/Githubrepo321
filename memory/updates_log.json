@@ -1,0 +1,150 @@
+[
+  {
+    "timestamp": "2026-08-13T18:09:24Z",
+    "prompt_summary": "add a /couple command that sends a romantic message to someone",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/couple.py"
+    ],
+    "provider": "openrouter:sk-or-v1...932b",
+    "backup_timestamp": "20260813_180321",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "openrouter",
+        "model": "openrouter/free",
+        "key": "sk-or-v1...aa01"
+      },
+      {
+        "provider": "openrouter",
+        "model": "openrouter/free",
+        "key": "sk-or-v1...932b"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-08-13T20:39:44Z",
+    "prompt_summary": "Add a /testupdate command that replies with \"Gemini update test successful\". Register the command using the existing plugin/command system, save the changes, verify the bot starts correctly, and report the progress and final result in Teleg",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/testupdate.py"
+    ],
+    "provider": "gemini:AQ.Ab8RN...2jJQ",
+    "backup_timestamp": "20260813_203932",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "key": "AQ.Ab8RN...2hdw"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...2jJQ"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-08-13T22:07:01Z",
+    "prompt_summary": "Create a temporary test command named .geminitest that replies \"Gemini fallback test successful\". Add it using the existing plugin/command system, save it, verify it loads correctly, and restart the bot if required. Do not modify any unrela",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/geminitest.py"
+    ],
+    "provider": "gemini:AQ.Ab8RN...2jJQ",
+    "backup_timestamp": "20260813_220520",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "key": "AQ.Ab8RN...2hdw"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...2jJQ"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-08-13T22:12:35Z",
+    "prompt_summary": "Delete ONLY the temporary .geminitest command and its plugin file. Remove its registration if necessary. Do not modify any other commands, plugins, files, Gemini/OpenRouter logic, or update system. Verify that .geminitest no longer works an",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/geminitest.py"
+    ],
+    "provider": "gemini:AQ.Ab8RN...2jJQ",
+    "backup_timestamp": "20260813_221059",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "key": "AQ.Ab8RN...2hdw"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...2jJQ"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-08-13T22:26:27Z",
+    "prompt_summary": "Add a new .tohid command to the bot. When a user sends .tohid, the bot should reply with my Telegram username: @SAREEF_FUCKER. Make sure the command works correctly and does not affect any existing commands or functionality.",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/tohid.py"
+    ],
+    "provider": "openrouter:sk-or-v1...a972",
+    "backup_timestamp": "20260813_222444",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "openrouter",
+        "model": "openrouter/free",
+        "key": "sk-or-v1...932b"
+      },
+      {
+        "provider": "openrouter",
+        "model": "openrouter/free",
+        "key": "sk-or-v1...a972"
+      }
+    ]
+  },
+  {
+    "timestamp": "2026-08-13T22:39:40Z",
+    "prompt_summary": "I want you to add a complete Telegram Voice Chat audio playback system to my existing Telegram userbot.\n\nIMPORTANT:\n- Do NOT remove, break, or rewrite any existing features, commands, plugins, database logic, or AI features.\n- Inspect the e",
+    "summary": "Verified self-update",
+    "changed_files": [
+      "telegram_userbot/plugins/voice_chat.py"
+    ],
+    "provider": "gemini:AQ.Ab8RN...LuuQ",
+    "backup_timestamp": "20260813_223728",
+    "result": "success",
+    "provider_calls": [
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...32yw"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...2jJQ"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...au-A"
+      },
+      {
+        "provider": "gemini",
+        "model": "gemini-flash-latest",
+        "key": "AQ.Ab8RN...LuuQ"
+      }
+    ]
+  }
+]

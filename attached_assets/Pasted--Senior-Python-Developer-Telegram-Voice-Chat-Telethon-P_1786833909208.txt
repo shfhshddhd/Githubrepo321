@@ -1,0 +1,246 @@
+तुम एक Senior Python Developer और Telegram Voice-Chat सिस्टम के विशेषज्ञ हो। तुम्हें Telethon, PyTgCalls, Telegram Bot API, Telegram Mini Apps, WebRTC/WebSocket, FastAPI/Quart, FFmpeg और MongoDB का अच्छा अनुभव है।
+
+मेरे पास एक EXISTING और पहले से चल रहा Telegram hosted-userbot project है। इसे दोबारा शुरू से मत बनाना और existing features को बिल्कुल मत तोड़ना।
+
+सबसे पहले पूरे project का code, architecture, dependencies, database structure और existing commands ध्यान से ANALYZE करो।
+
+IMPORTANT:
+पहले केवल analysis और implementation plan दो।
+अभी कोई existing code modify मत करो।
+पहले मुझे बताओ कि यह feature मेरे वर्तमान architecture में किस तरह safely implement होगा और किन files में बदलाव करने पड़ेंगे।
+
+मेरे existing system में:
+- Telegram BotFather से बनाया हुआ control bot है।
+- User `/host` जैसी command के जरिए अपना Telegram account host कर सकता है।
+- Hosted Telegram user account से `.vcjoin` command करने पर वह account Voice Chat में join हो जाता है।
+- Existing `.play`, `.volume` और दूसरी userbot commands पहले से काम कर रही हैं।
+- Project में MongoDB/hosting configuration पहले से मौजूद है।
+- Existing commands और plugins को बिल्कुल सुरक्षित रखना है।
+
+मुझे अब केवल यह नया FEATURE जोड़ना है:
+
+1. TELEGRAM MINI APP / OPEN BUTTON
+मेरे control bot में Telegram का official Mini App/Web App वाला “Open” button चाहिए।
+
+जब user “Open” दबाए:
+- Telegram के अंदर ही एक mobile-friendly Web App खुले।
+- अलग से random URL भेजने की जरूरत न हो।
+- Web App secure हो।
+- केवल authorized/hosted user ही अपने session को control कर सके।
+- Mic permission browser से properly मांगी जाए।
+
+2. LIVE MICROPHONE → TELEGRAM VC
+मेरा hosted userbot पहले की तरह `.vcjoin` से Voice Chat में connected रहेगा।
+
+Mini App में:
+- Mic ON/OFF button हो।
+- LIVE/STOP button हो।
+- Connection status दिखाई दे।
+- Mobile browser के microphone से मेरी live voice capture हो।
+- यह audio सुरक्षित तरीके से backend/server तक जाए।
+- Backend उस audio को मेरे hosted Telegram user session के जरिए उसी Voice Chat में live stream करे।
+
+मेरा उद्देश्य है:
+मैं Telegram VC में खुद physically join किए बिना Mini App खोलकर बोल सकूँ और मेरी live आवाज़ VC में मौजूद लोगों तक पहुंचे।
+
+3. VC से LIVE AUDIO मुझे वापस सुनाई दे
+जहाँ Telegram/PyTgCalls/API की technical limitations अनुमति दें, उसी Mini App में Voice Chat का incoming audio मेरे phone/browser तक वापस भेजने की व्यवस्था बनाओ।
+
+मुझे ideally दो-way audio चाहिए:
+
+PHONE MIC
+↓
+Mini App
+↓
+Backend
+↓
+Hosted Userbot
+↓
+Telegram Voice Chat
+↓
+VC participants
+
+और वापस:
+
+Telegram Voice Chat
+↓
+Hosted Userbot
+↓
+Backend
+↓
+Mini App
+↓
+Phone speaker/headphones
+
+अगर Telegram या PyTgCalls किसी हिस्से को technically support नहीं करता, तो उसे invent मत करना। पहले limitation साफ बताना और जो technically reliable architecture possible है वही implement करना।
+
+4. LIVE VOLUME CONTROL
+मेरे existing `.volume` command को live microphone stream पर भी लागू करो।
+
+उदाहरण:
+.volume 100
+.volume 200
+.volume 500
+.volume 1000
+.volume 2000
+
+मैं जो gain/volume value दूँ, live microphone audio पर वही amplification लागू हो।
+
+कोई artificial छोटा maximum जैसे 100 या 200 मत लगाओ।
+
+लेकिन implementation ऐसा रखो कि:
+- बहुत ज्यादा gain पर clipping/distortion हो सकती है।
+- Audio pipeline की वास्तविक technical limits के अंदर जितना gain possible है उतना apply हो।
+- User खुद volume कम कर सके।
+
+मुझे automatic noise reduction, voice beautification, AI voice processing या voice-changing नहीं चाहिए।
+
+मेरी natural voice को जितना possible हो वैसा ही रखा जाए और केवल gain/amplification किया जाए।
+
+5. AUDIO PROCESSING
+Default audio processing minimal रखो।
+
+नहीं चाहिए:
+- Noise reduction
+- Voice changer
+- Echo cancellation अगर वह आवश्यक नहीं है
+- AI voice enhancement
+- Voice effects
+- Pitch change
+
+सिर्फ जरूरी resampling/codec conversion और volume gain किया जा सकता है ताकि Telegram VC stream ठीक से काम करे।
+
+6. PUSH TO TALK
+Mini App में Push-To-Talk option भी दो।
+
+Button दबाने पर mic stream शुरू हो।
+Button छोड़ने पर mic mute हो जाए।
+
+साथ में normal Mic ON/OFF mode भी रखा जा सकता है।
+
+7. CONNECTION STATUS
+Mini App में साफ दिखाई दे:
+- Connected / Disconnected
+- Mic ON/OFF
+- VC Connected / Not Connected
+- Live Streaming ON/OFF
+- Current volume/gain
+
+8. AUTO RECONNECT
+अगर WebSocket/WebRTC connection थोड़ी देर के लिए टूट जाए तो safe auto-reconnect हो।
+
+अगर Telegram Voice Chat connection टूटे तो existing `.vcjoin` logic को नुकसान न पहुंचे।
+
+9. SECURITY
+बहुत जरूरी:
+
+- किसी दूसरे व्यक्ति को मेरे hosted user session तक access नहीं मिलना चाहिए।
+- Mini App authorization को Telegram WebApp authentication से verify करो।
+- User ID/session ownership verify करो।
+- Authentication token/session data frontend में expose मत करो।
+- Telegram API credentials, bot token, session strings और MongoDB credentials कभी browser में मत भेजो।
+- Secrets environment variables में रखो।
+- Unauthorized user को live mic/VC access बिल्कुल न मिले।
+
+10. EXISTING PROJECT को मत तोड़ना
+इन चीजों को बिना जरूरत modify मत करना:
+- Existing `.vcjoin`
+- `.play`
+- `.volume`
+- Existing plugins
+- Existing BotFather commands
+- MongoDB structure
+- Hosting/session system
+- Existing Telegram user session handling
+
+अगर किसी existing module में बदलाव जरूरी है तो पहले उसका कारण बताओ और backward compatibility रखो।
+
+11. TECHNOLOGY
+मेरे existing project में जो framework पहले से इस्तेमाल हो रहा है उसे प्राथमिकता दो।
+
+बिना जरूरत पूरा architecture बदलकर नया framework मत डालो।
+
+जहाँ appropriate हो:
+- Telegram Mini App
+- FastAPI/Quart
+- WebSocket/WebRTC
+- PyTgCalls
+- FFmpeg
+- Telethon
+का इस्तेमाल किया जा सकता है।
+
+लेकिन पहले existing dependencies check करो और duplicate/conflicting libraries मत जोड़ो।
+
+12. MOBILE FRIENDLY UI
+Mini App Android phone पर अच्छे से चले।
+
+UI में कम से कम:
+- Open/Connect
+- Mic ON/OFF
+- Push-To-Talk
+- Start Live
+- Stop Live
+- Volume/Gain control
+- Connection status
+
+हो।
+
+13. ERROR HANDLING
+अगर:
+- Mic permission denied हो
+- VC connected न हो
+- User hosted न हो
+- Session invalid हो
+- WebSocket disconnect हो
+- Audio stream fail हो
+- Telegram call connection fail हो
+
+तो user को साफ error message मिले और पूरा bot crash न हो।
+
+14. DEPLOYMENT
+Replit environment में यह project deploy हो सके।
+
+अगर Mini App के लिए HTTPS/domain/public URL जरूरी है तो implementation में उसकी requirement clearly बताओ।
+
+Replit Secrets/Environment Variables का उपयोग करो।
+
+15. IMPLEMENTATION METHOD
+पहले existing project analyze करो।
+
+फिर मुझे:
+A. Current architecture summary
+B. कौन-कौन सी files बदलेंगी
+C. कौन-कौन सी नई files बनेंगी
+D. कौन-कौन से dependencies चाहिए
+E. Audio flow कैसे काम करेगा
+F. Security कैसे maintain होगी
+G. Replit deployment में क्या चाहिए
+
+बताओ।
+
+उसके बाद ही implementation शुरू करो।
+
+Implementation करते समय:
+- Existing code delete मत करो।
+- Existing functionality replace मत करो।
+- पहले backup/checkpoint बनाओ।
+- छोटे और testable steps में feature implement करो।
+- हर बड़े बदलाव के बाद tests/run checks करो।
+- Errors को खुद diagnose करके fix करो।
+
+सबसे महत्वपूर्ण:
+मुझे ऐसा fake/demo UI नहीं चाहिए जो केवल microphone को browser में चलाए लेकिन Telegram VC तक audio न पहुंचाए।
+
+मुझे वास्तविक working architecture चाहिए जिसमें:
+PHONE MIC → MINI APP → SERVER → HOSTED TELEGRAM USER SESSION → TELEGRAM VC
+
+तक live audio पहुंचे।
+
+और जहाँ technically संभव हो:
+TELEGRAM VC → SERVER → MINI APP → PHONE
+
+से incoming VC audio मुझे सुनाई दे।
+
+अगर किसी हिस्से की Telegram/PyTgCalls limitation के कारण वास्तविक implementation संभव नहीं है, तो उसे छुपाना या fake करना नहीं है। मुझे साफ बताओ कि कौन सा हिस्सा possible है और कौन सा नहीं।
+
+पहले ANALYZE करो और implementation plan दो। अभी code modify मत करो।

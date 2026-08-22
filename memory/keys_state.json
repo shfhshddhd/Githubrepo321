@@ -1,0 +1,16 @@
+{
+  "providers": {
+    "gemini": {
+      "keys": [],
+      "last_used_index": 0
+    },
+    "openrouter": {
+      "keys": [],
+      "last_used_index": 0
+    },
+    "anthropic": {
+      "keys": [],
+      "last_used_index": 0
+    }
+  }
+}

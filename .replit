@@ -1,0 +1,50 @@
+modules = ["nodejs-24", "python-base-3.13"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Telegram Userbot"
+
+[[workflows.workflow]]
+name = "Telegram Userbot"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "while true; do .pythonlibs/bin/python telegram_userbot/main.py; status=$?; if [ \"$status\" -eq 0 ]; then sleep 5; else sleep 10; fi; done"
+waitForPort = 8008
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
+packages = ["ffmpeg", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "openssl", "tcl", "tk", "xcodebuild", "zlib"]
+
+[userenv]
+
+[userenv.shared]
+OWNER_ID = "1229452439"

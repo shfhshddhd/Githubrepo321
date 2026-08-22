@@ -1,0 +1,76 @@
+You are working on my Telegram userbot project running on Replit. It has two parts:
+1. CONTROL BOT — slash commands (/start, /host, /unhost, /targetadd, /boton, /aimodeon, /addkey, etc.)
+2. HOSTED USERBOT — after /host, my account loads plugins with dot commands (.help, .plugins, .ping, .alive, plus custom plugins)
+
+I already have (or you must create) a self-update plugin with: .updatetohidbot <prompt> (sends prompt + project files to Gemini, applies returned code changes, backs up to backups/<timestamp>/, restarts via the while-loop in .replit).
+
+Implement ALL of the following in that plugin and supporting modules. Inspect existing code first and match its style.
+
+═══════════════════════════════
+1. RESTORE COMMAND
+═══════════════════════════════
+Add .restorebackup <timestamp> — OWNER ONLY.
+- No timestamp → list available backups from backups/updates.log (timestamp + changed files), formatted nicely.
+- With timestamp → verify backups/<timestamp>/ exists; back up current files to backups/restore_<timestamp>/ first; copy all backed-up files back to their original paths; reply ✅ "Restored <n> files from <timestamp>. Restarting in 5 seconds..."; os._exit(0).
+- Never restore into .env, secrets, or outside the project.
+
+═══════════════════════════════
+2. TEST MODE + SELF-HEALING LOOP
+═══════════════════════════════
+After .updatetohidbot writes new files, BEFORE restarting:
+a. Run python -m py_compile on every changed .py file. Any compile error → reply ❌ with the exact error and the file, auto-restore from the backup made in this same update, and do NOT restart with broken code.
+b. If all files compile → send the updated files BACK to the AI (same session, ask it to double-check for obvious bugs: missing imports, wrong function names, duplicate handlers). If the AI finds fixes, apply them (with backup) and re-run the syntax check. Loop max 2 extra fix rounds.
+c. Only after checks pass → reply ✅ "Update verified. Restarting..." and exit for the restart loop.
+
+═══════════════════════════════
+3. SMART KEY MANAGER (auto-switch on limit)
+═══════════════════════════════
+Create key_manager.py that replaces the current key rotation:
+- Keep all keys from /addkey (tried first) and GEMINI_API_KEY env (last fallback).
+- Before each request, pick the first key NOT in cooldown. Mark the last-used key + timestamp in memory/keys_state.json.
+- On HTTP 429, 403 quota, 500/502/503, or any "quota exceeded"/"rate limit" error → mark that key EXHAUSTED with cooldown_until = now + 24h, reply progress ("⚠️ Key N hit daily limit, switching to next key..."), and RETRY the SAME request with the next available key (the prompt/request must NOT be lost — store it in a queue file before calling).
+- Keys with cooldown_until in the past are automatically re-enabled.
+- If ALL Gemini keys are exhausted → try the OpenRouter fallback (requirement 4) → if that fails too, save the request to memory/pending_updates.json and reply "⏳ All API keys exhausted. Request saved, will auto-retry in 10 minutes." Add a background task that retries pending updates every 10 minutes.
+- /listkeys must now also show each key's status: active / exhausted-until <time>.
+
+═══════════════════════════════
+4. MULTI-PROVIDER SUPPORT (make it smarter)
+═══════════════════════════════
+Support these providers in order, configured via environment secrets:
+1. Gemini (keys from /addkey) — model: gemini-2.5-pro (or newest available), fallback gemini-1.5-flash
+2. OpenRouter (OPENROUTER_API_KEY secret) — try strong free/low-cost models for coding, e.g. deepseek/deepseek-chat, qwen/qwen-2.5-coder-32b, or anthropic/claude-3.5-sonnet if the user has credits. Use the OpenRouter chat completions API.
+3. Optionally Anthropic direct (ANTHROPIC_API_KEY secret) — model claude-sonnet-4 / claude-3-5-sonnet — for best-quality code edits, closest to Replit Agent quality.
+Each provider call uses the same system prompt and full-file context, and returns the same JSON format. Wrap all providers behind ONE function: ai_generate(prompt, context_files) -> json, which handles provider fallback + key cooldowns internally. Log which provider/key was used in memory/updates_log.json.
+
+═══════════════════════════════
+5. PERSISTENT MEMORY (survives key changes)
+═══════════════════════════════
+Create memory/memory.py:
+- conversations.json — append every .updatetohidbot request + AI reply + result (success/error), with timestamps. Max 200 entries (trim oldest).
+- learned_facts.json — bot stores important project facts it learns: entry file name, framework (Pyrogram/Telethon), plugin pattern, storage files used. Built from the first successful scan and updated after each successful change.
+- updates_log.json — history of all applied changes (timestamp, prompt summary, files changed, provider+key used, backup timestamp).
+- The AI system prompt must include: last 5 conversations, the last 3 applied changes, and any learned facts, so the AI has continuity and remembers the project across key switches. Memory NEVER stores raw API keys.
+- Add .memory command (owner only) that shows: memory stats (entries, last update, provider used, keys status). 
+
+═══════════════════════════════
+6. SAFETY (unchanged from before)
+═══════════════════════════════
+- Never write to .env, secrets, or backup folders via AI.
+- Validate all returned paths (no absolute paths, no ../, no .env).
+- Owner-only on: .updatetohidbot, .restorebackup, .memory.
+- Keep .replit run command as the auto-restart while-loop.
+
+TESTING: After implementing, restart, then from my hosted account send:
+1. .listkeys — verify key statuses show.
+2. .updatetohidbot "add a .version command" — verify it works, backup created, bot restarts.
+3. .restorebackup — verify backup list appears, then restore the previous backup.
+4. .memory — verify memory stats.
+Simulate an exhausted key by temporarily setting a key's cooldown in memory/keys_state.json and verify auto-switch works and the request is not lost.
+
+SUMMARY: files created/modified, provider fallback order, how memory works, and restart steps.
+
+Also add TWO more owner-only commands to the key manager:
+.addopenrouterkey <API_KEY> — adds a key for the OpenRouter provider, stored in memory/keys_state.json (never in code).
+.addclaudekey <API_KEY> — adds an Anthropic Claude key the same way.
+/listkeys must show all providers: Gemini keys (masked, with status), OpenRouter keys, Claude keys.
+If a provider has zero keys saved, the system skips that provider automatically.

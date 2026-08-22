@@ -1,0 +1,1 @@
+{"tag":"phase3-5-7-coordinated-start-20260816_001712","scope":"Before coordinated Mini App live audio work","restores":"telegram_userbot/webapp, telegram_userbot/plugins/voice_chat.py, telegram_userbot/config.py, artifacts/api-server/src/app.ts, artifacts/api-server/src/routes/mini-app-proxy.ts"}
