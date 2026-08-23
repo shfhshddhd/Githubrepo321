@@ -102,3 +102,4 @@ yt-dlp
 python-telegram-bot==21.10
 edge-tts
 py-tgcalls
+yt-dlp
