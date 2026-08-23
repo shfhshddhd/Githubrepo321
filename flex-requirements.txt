@@ -100,3 +100,4 @@ webencodings==0.5.1
 yarl==1.18.3
 yt-dlp
 python-telegram-bot==21.10
+edge-tts
