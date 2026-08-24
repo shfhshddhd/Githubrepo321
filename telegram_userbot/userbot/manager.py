@@ -23,7 +23,16 @@ class UserbotManager:
     # ── Startup ────────────────────────────────────────────────────────────────
 
     async def start_all(self) -> None:
-        """Load all active sessions from DB and start them."""
+        """Restore every explicitly hosted session after process restart.
+
+        Always re-establish durable MongoDB storage before reading the active
+        list. Never treat the ephemeral local fallback as an empty hosted list.
+        """
+        if not await db.ensure_persistent_storage():
+            logger.error(
+                "Hosted sessions were not restored: durable MongoDB storage is unavailable."
+            )
+            return
         try:
             users = await db.get_all_active_users()
         except Exception as exc:
@@ -61,6 +70,8 @@ class UserbotManager:
             raise RuntimeError("Persistent MongoDB storage is unavailable; refusing to host a session that could be lost on restart.")
         if user_id in self._clients:
             await self._clients[user_id].stop()
+        if not isinstance(session_string, str) or not session_string.strip():
+            raise RuntimeError("Telegram returned an empty session; refusing to host it.")
         await db.save_session(user_id, session_string)
         await self._start_one(user_id, session_string)
 
