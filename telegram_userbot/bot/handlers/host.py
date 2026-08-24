@@ -34,7 +34,10 @@ class PendingHostTextFilter(BaseFilter):
 
     def filter(self, message) -> bool:
         user = getattr(message, "from_user", None)
-        return user is not None and user.id in _pending
+        pending = _pending.get(user.id) if user is not None else None
+        # The top-level recovery handler must never treat ordinary text as
+        # a phone number; it is valid only during OTP or 2FA phases.
+        return bool(pending and pending.get("stage") in {"otp", "password"})
 
 
 HOST_SUCCESS_TEXT = (
@@ -57,6 +60,15 @@ HOST_SUCCESS_TEXT = (
 async def host_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     manager = ctx.bot_data["manager"]
+
+    # A completed/restarted host must not inherit an old in-flight auth
+    # attempt, which could make ordinary messages look like phone input.
+    stale = _pending.pop(user_id, None)
+    if stale:
+        try:
+            await stale["client"].disconnect()
+        except Exception:
+            logger.debug("Could not close stale auth client for %s", user_id, exc_info=True)
 
     if manager.is_hosted(user_id):
         await reply_text(
@@ -221,19 +233,23 @@ async def host_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         try:
             await pending["client"].disconnect()
         except Exception:
-            pass
-    await reply_text(update.message, "❎ /host cancelled.")
+            logger.debug("Could not close cancelled auth client for %s", user_id, exc_info=True)
+    # Explicitly clear any PTB conversation user data used by this flow.
+    ctx.user_data.pop("host", None)
+    await reply_text(update.message, "❎ /host process cancelled. No hosted account was removed.")
     return ConversationHandler.END
 
 
 async def host_text_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     """Route auth text by the durable pending phase, not only PTB state."""
     pending = _pending.get(update.effective_user.id)
-    if pending and pending.get("stage") == "password":
+    if not pending:
+        return ConversationHandler.END
+    if pending.get("stage") == "password":
         return await host_password(update, ctx)
-    if pending and pending.get("stage") == "otp":
+    if pending.get("stage") == "otp":
         return await host_otp(update, ctx)
-    return await host_phone(update, ctx)
+    return ConversationHandler.END
 
 
 def build_host_handler() -> ConversationHandler:
@@ -241,9 +257,9 @@ def build_host_handler() -> ConversationHandler:
     return ConversationHandler(
         entry_points=[CommandHandler("host", host_start)],
         states={
-            PHONE: [text],
-            OTP: [text],
-            PASSWORD: [text],
+            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_phone)],
+            OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_otp)],
+            PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_password)],
         },
         fallbacks=[CommandHandler("cancel", host_cancel)],
         allow_reentry=True,
