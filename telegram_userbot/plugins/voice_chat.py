@@ -1,64 +1,3 @@
-                            with contextlib.suppress(asyncio.QueueFull):
-                                subscriber.put_nowait(payload)
-                    if voice_ai_reached:
-                        now = time.monotonic()
-                        self._voice_ai_capture_first_packet_at = (
-                            getattr(
-                                self,
-                                "_voice_ai_capture_first_packet_at",
-                                None,
-                            )
-                            or now
-                        )
-                        self._voice_ai_capture_last_packet_at = now
-                        self._voice_ai_capture_packet_count = (
-                            getattr(
-                                self,
-                                "_voice_ai_capture_packet_count",
-                                0,
-                            )
-                            + 1
-                        )
-                        self._voice_ai_capture_packet_bytes = (
-                            getattr(
-                                self,
-                                "_voice_ai_capture_packet_bytes",
-                                0,
-                            )
-                            + len(payload)
-                        )
-                        activity_event = getattr(
-                            self,
-                            "_voice_ai_capture_activity",
-                            None,
-                        )
-                        if activity_event is not None:
-                            activity_event.set()
-                    logger.info(
-                        "[VOICE_AI_DEBUG] PACKET_RECEIVED chat_id=%s "
-                        "frame_type=%s frame_bytes=%d timestamp=%s "
-                        "PACKET_BYTES=%d CHAT_MATCH=%s VOICE_AI_REACHED=%s.",
-                        update_chat_id,
-                        type(frame).__name__,
-                        len(payload),
-                        frame_timestamp,
-                        len(payload),
-                        chat_match,
-                        voice_ai_reached,
-                    )
-                return
-            if not isinstance(update, StreamEnded):
-                return
-            if getattr(self, "_voice_ai_enabled", False):
-                logger.info(
-                    "[VOICE_AI_DEBUG] stream ended chat=%s type=%s device=%s.",
-                    update.chat_id,
-                    update.stream_type,
-                    update.device,
-                )
-            if update.stream_type != StreamEnded.Type.AUDIO:
-                return
-            state = self.state
             expected_track = (
                 state.current
                 if state is not None
@@ -988,3 +927,56 @@ async def register_commands():
         ],
         "Private control-bot Voice Chat playback and gain-only controls",
     )
+
+    # Keep the original hosted-account UX working as well as the private
+    # control-bot bridge.  The same manager is used in both paths, so joining
+    # from the hosted account is immediately visible to the Mini App.
+    manager = _manager
+    if manager is None:
+        raise RuntimeError("Voice Chat manager was not initialized.")
+
+    @manager.client.on(events.NewMessage(pattern=r"(?i)^\.(vcjoin|vcstatus|vcstop|vcleave|play|pause|resume|skip|queue|clearqueue|volume|mute|unmute)(?:\s+(.*))?$"))
+    async def hosted_voice_command(event):
+        manager = getattr(event.client, "_voice_chat_manager", None)
+        if manager is None:
+            await event.reply("❌ Voice Chat plugin is unavailable. Check plugin loading logs.")
+            return
+        command = event.pattern_match.group(1).lower()
+        args = (event.pattern_match.group(2) or "").strip()
+        try:
+            if command == "vcjoin":
+                text = await manager.join_target(args)
+            elif command == "vcstatus":
+                text = await manager.control_status()
+            elif command == "vcstop":
+                text = "❌ Not connected to any Voice Chat." if manager.state is None else await manager.stop(manager.state.chat_id)
+            elif command == "vcleave":
+                text = "❌ Not connected to any Voice Chat." if manager.state is None else await manager.leave(manager.state.chat_id)
+            elif command == "play":
+                if manager.state is None:
+                    raise RuntimeError("Join an active Voice Chat first with .vcjoin.")
+                text = await manager.enqueue(event, manager.state.chat_id, args)
+            elif manager.state is None:
+                raise RuntimeError("Join an active Voice Chat first with .vcjoin.")
+            elif command == "pause":
+                text = await manager.pause(manager.state.chat_id)
+            elif command == "resume":
+                text = await manager.resume(manager.state.chat_id)
+            elif command == "skip":
+                text = await manager.skip(manager.state.chat_id)
+            elif command == "queue":
+                text = await manager.queue_text(manager.state.chat_id)
+            elif command == "clearqueue":
+                text = await manager.clear_queue(manager.state.chat_id)
+            elif command == "volume":
+                text = await manager.change_volume(manager.state.chat_id, int(args))
+            elif command == "mute":
+                text = await manager.mute(manager.state.chat_id)
+            else:
+                text = await manager.unmute(manager.state.chat_id)
+            await event.reply(text)
+        except NoActiveGroupCall:
+            await event.reply("❌ No active Voice Chat found in that group.")
+        except Exception as exc:
+            logger.exception("Hosted Voice Chat command failed: %s", command)
+            await event.reply(f"❌ {exc}")
