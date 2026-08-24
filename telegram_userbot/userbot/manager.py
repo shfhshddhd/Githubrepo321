@@ -49,7 +49,7 @@ class UserbotManager:
 
     async def add_session(self, user_id: int, session_string: str) -> None:
         """Persist and start a newly authenticated userbot."""
-        if not db.has_persistent_storage():
+        if not await db.ensure_persistent_storage():
             raise RuntimeError("Persistent MongoDB storage is unavailable; refusing to host a session that could be lost on restart.")
         if user_id in self._clients:
             await self._clients[user_id].stop()
@@ -114,12 +114,14 @@ class UserbotManager:
         Raises SessionPasswordNeededError if 2FA password is still required.
         The caller must store the client and call sign_in_with_password() next.
         """
-        await client.sign_in(phone=phone, code=otp, phone_code_hash=phone_code_hash)
-        # Reached here → auth complete, no 2FA needed
-        session_string = client.session.save()
-        await self.add_session(user_id, session_string)
-        await client.disconnect()
-        return session_string
+        try:
+            await client.sign_in(phone=phone, code=otp, phone_code_hash=phone_code_hash)
+            # Reached here → auth complete, no 2FA needed
+            session_string = client.session.save()
+            await self.add_session(user_id, session_string)
+            return session_string
+        finally:
+            await client.disconnect()
 
     async def sign_in_with_password(
         self,
@@ -131,11 +133,13 @@ class UserbotManager:
         Complete 2FA sign-in after SessionPasswordNeededError was raised.
         Returns the session string on success.
         """
-        await client.sign_in(password=password)
-        session_string = client.session.save()
-        await self.add_session(user_id, session_string)
-        await client.disconnect()
-        return session_string
+        try:
+            await client.sign_in(password=password)
+            session_string = client.session.save()
+            await self.add_session(user_id, session_string)
+            return session_string
+        finally:
+            await client.disconnect()
 
     async def resolve_target(self, user_id: int, identifier: str) -> dict | None:
         """
