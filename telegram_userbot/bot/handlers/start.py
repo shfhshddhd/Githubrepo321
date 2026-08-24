@@ -161,16 +161,14 @@ async def livemic_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> Non
 async def start_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await reply_html(
         update.message,
-        MENU_TEXT,
-        reply_markup=_live_vc_markup(update, ctx),
+        MENU_TEXT,
     )
 
 
 async def help_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await reply_html(
         update.message,
-        MENU_TEXT,
-        reply_markup=_live_vc_markup(update, ctx),
+        MENU_TEXT,
     )
 
 
