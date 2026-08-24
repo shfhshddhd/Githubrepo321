@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 from html import escape
 import logging
 import re
@@ -75,6 +76,21 @@ class VoiceState:
     recording_started_at: float | None = None
     closing: bool = False
     playback_epoch: int = 0
+    playback_deadline: float | None = None
+    playback_remaining: float | None = None
+    playback_paused: bool = False
+    playback_watchdog: asyncio.Task | None = None
+    live_active: bool = False
+    live_mic_enabled: bool = False
+    live_push_to_talk: bool = False
+    live_push_active: bool = False
+    live_started_at: float | None = None
+    live_last_frame_at: float | None = None
+    live_frame_count: int = 0
+    live_byte_count: int = 0
+    live_frame_queue: asyncio.Queue[bytes] | None = None
+    live_sender_task: asyncio.Task | None = None
+    receive_subscribers: set[asyncio.Queue[bytes]] = field(default_factory=set)
     transition_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -360,6 +376,21 @@ class VoiceChatManager:
         if self._bound_chat_id == chat_id:
             self._bound_chat_id = None
 
+    async def _reset_transport(self) -> None:
+        """Stop and replace PyTgCalls after every full Voice Chat leave."""
+        calls = self.calls
+        stop = getattr(calls, "stop", None)
+        if callable(stop):
+            with contextlib.suppress(Exception):
+                result = stop()
+                if inspect.isawaitable(result):
+                    await result
+        # Supported py-tgcalls versions without stop() still get a fresh
+        # wrapper, dropping callbacks, transport references, and call caches.
+        self.calls = PyTgCalls(self.client)
+        self._started = False
+        self._bound_chat_id = None
+
     async def _reset_connection_state(self, state: VoiceState, *, leave_remote: bool = False) -> None:
         """Clear local PyTgCalls state even when Telegram already removed us."""
         state.closing = True
@@ -372,6 +403,7 @@ class VoiceChatManager:
             # py-tgcalls 2.3.3 needs both cleanup paths when Telegram has
             # already processed a manual leave or leave_call raised.
             await self._clear_call_binding(state.chat_id)
+            await self._reset_transport()
         finally:
             self._clear_state(state)
             if self.state is state:
@@ -386,8 +418,9 @@ class VoiceChatManager:
             entity = await self.client.get_entity(state.chat_id)
             call = await self._active_group_call(entity)
         except Exception:
-            logger.warning("Could not reconcile Voice Chat state for %s.", state.chat_id, exc_info=True)
-            return True
+            logger.warning("Could not reconcile Voice Chat state for %s; resetting it.", state.chat_id, exc_info=True)
+            await self._reset_connection_state(state)
+            return False
         if call is None or await self._is_current_user_in_call(entity, call) is False:
             await self._reset_connection_state(state)
             logger.info("Cleared stale Voice Chat state after Telegram-side leave: chat_id=%s.", state.chat_id)
@@ -1253,6 +1286,7 @@ class VoiceChatManager:
                 await self.calls.leave_call(state.chat_id)
             self._clear_state(state)
             self.state = None
+        await self._reset_transport()
         for task in list(self._tasks):
             task.cancel()
         if self._tasks:
