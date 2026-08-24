@@ -32,7 +32,14 @@ After <code>/host</code> succeeds, use these commands from your hosted account:
 <b>🎙️ Voice Chat (private control bot only)</b>
 <code>.vcjoin &lt;group&gt;</code> — join an active Voice Chat
 <code>.vcstatus</code> — show connected group and playback status
+<code>.vcstop</code> / <code>.vcleave</code> — stop playback / leave
+<code>.pause</code> / <code>.resume</code> / <code>.skip</code> — playback controls
+<code>.queue</code> / <code>.clearqueue</code> — queue controls
+<code>.volume &lt;value&gt;</code> / <code>.mute</code> / <code>.unmute</code>
 Reply to audio/voice/video with <code>.play</code> — play it in the connected Voice Chat
+
+🎙️ <b>Live Mic</b>
+<code>/livemic</code> — open the Live Mic control panel (join with <code>.vcjoin</code> first)
 
 The complete plugin command list is available through <code>.help</code>.
 """
@@ -97,7 +104,14 @@ After <code>/host</code> succeeds, use these commands from your hosted account:
 <b>🎙️ Voice Chat (private control bot only)</b>
 <code>.vcjoin &lt;group&gt;</code> — join an active Voice Chat
 <code>.vcstatus</code> — show connected group and playback status
+<code>.vcstop</code> / <code>.vcleave</code> — stop playback / leave
+<code>.pause</code> / <code>.resume</code> / <code>.skip</code> — playback controls
+<code>.queue</code> / <code>.clearqueue</code> — queue controls
+<code>.volume &lt;value&gt;</code> / <code>.mute</code> / <code>.unmute</code>
 Reply to audio/voice/video with <code>.play</code> — play it in the connected Voice Chat
+
+🎙️ <b>Live Mic</b>
+<code>/livemic</code> — open the Live Mic control panel
 
 The complete plugin command list is available through <code>.help</code>.
 """
@@ -123,6 +137,31 @@ def _live_vc_markup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ]
         )
     return None
+
+
+async def livemic_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Expose Live Mic as a stable slash command as well as a /start button."""
+    if update.effective_chat is None or update.effective_chat.type != "private":
+        return
+    mini_app = ctx.bot_data.get("mini_app_server")
+    url = config.mini_app_url()
+    if url and mini_app is not None and mini_app.is_running:
+        await reply_html(
+            update.message,
+            "🎙️ <b>Live Mic / Voice Chat</b>\n"
+            "Join an active chat with <code>.vcjoin &lt;group&gt;</code>, "
+            "then open the control panel below.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Open Live Mic / VC", web_app=WebAppInfo(url))]]
+            ),
+        )
+        return
+    await reply_html(
+        update.message,
+        "🎙️ <b>Live Mic is not publicly configured yet.</b>\n"
+        "Set the <code>MINI_APP_URL</code> and <code>SESSION_SECRET</code> "
+        "GitHub Actions secrets, then restart the workflow.",
+    )
 
 
 async def start_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
