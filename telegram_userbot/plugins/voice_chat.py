@@ -24,6 +24,14 @@ from pytgcalls.exceptions import NoActiveGroupCall
 from pytgcalls import PyTgCalls
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 from pytgcalls.types import MediaStream, RecordStream, StreamEnded, StreamFrames
+
+# GroupCallConfig is not exported by py-tgcalls 2.3.3. Keep this
+# optional so the plugin works across supported library versions; 2.3.3
+# uses the compatible play(chat_id, None) form below.
+try:
+    from pytgcalls.types import GroupCallConfig
+except ImportError:
+    GroupCallConfig = None
 from telethon import events, functions
 from telethon.tl import types as tl_types
 from telethon.utils import get_peer_id
