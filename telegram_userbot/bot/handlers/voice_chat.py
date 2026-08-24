@@ -41,7 +41,11 @@ async def _voice_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return None
 
     manager = context.bot_data.get("manager")
-    hosted = manager.get_client(user.id) if manager is not None else None
+    hosted = (
+        await manager.ensure_client(user.id)
+        if manager is not None
+        else None
+    )
     if hosted is None or not hosted.is_running():
         return None
     voice = getattr(hosted.client, "_voice_chat_manager", None)
