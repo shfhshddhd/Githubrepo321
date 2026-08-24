@@ -69,6 +69,28 @@ class UserbotManager:
     def get_client(self, user_id: int) -> UserbotClient | None:
         return self._clients.get(user_id)
 
+    async def ensure_client(self, user_id: int) -> UserbotClient | None:
+        """Return a running hosted client, restoring it from MongoDB if needed."""
+        client = self.get_client(user_id)
+        if client is not None and client.is_running():
+            return client
+
+        try:
+            users = await db.get_all_active_users()
+        except Exception as exc:
+            logger.warning("Could not restore hosted user %s on demand: %s", user_id, exc)
+            return None
+
+        record = next((user for user in users if int(user["user_id"]) == int(user_id)), None)
+        if record is None:
+            return None
+
+        if client is not None:
+            await client.stop()
+            self._clients.pop(user_id, None)
+        await self._start_one(int(user_id), record["session_string"])
+        return self.get_client(int(user_id))
+
     # ── Telethon auth helpers (used by /host flow) ─────────────────────────────
 
     async def begin_auth(
