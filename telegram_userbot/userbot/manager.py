@@ -2,6 +2,7 @@
 Manages all active per-user Telethon userbot sessions.
 """
 import asyncio
+import contextlib
 import logging
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -42,8 +43,15 @@ class UserbotManager:
         client = UserbotClient(user_id, session_string)
         client.manager = self
         await client.start()
-        if client.is_running():
-            self._clients[user_id] = client
+        if not client.is_running():
+            # Do not report a session as active unless Telethon completed
+            # authorization and the long-lived client is actually connected.
+            with contextlib.suppress(Exception):
+                await client.stop()
+            raise RuntimeError(
+                f"Hosted account {user_id} could not be started or is not authorized."
+            )
+        self._clients[user_id] = client
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -138,7 +146,18 @@ class UserbotManager:
         """
         try:
             await client.sign_in(phone=phone, code=otp, phone_code_hash=phone_code_hash)
-            # Reached here → auth complete, no 2FA needed
+        except SessionPasswordNeededError:
+            # Keep this connected: host_password() continues the same
+            # Telethon login with the 2FA password.
+            raise
+        except Exception:
+            with contextlib.suppress(Exception):
+                await client.disconnect()
+            raise
+
+        # Save only after Telegram accepted the OTP, then replace the
+        # temporary auth client with a verified long-lived hosted client.
+        try:
             session_string = client.session.save()
             await self.add_session(user_id, session_string)
             return session_string
