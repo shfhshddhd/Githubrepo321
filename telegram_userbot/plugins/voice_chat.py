@@ -12,6 +12,7 @@ import contextlib
 import inspect
 from html import escape
 import logging
+import math
 import re
 import shutil
 import subprocess
@@ -106,6 +107,33 @@ def _format_duration(seconds: float) -> str:
     if hours:
         return f"{hours}h {minutes:02d}m {seconds:02d}s"
     return f"{minutes}m {seconds:02d}s"
+
+
+def _probe_duration(path: Path) -> float | None:
+    """Read media duration without making playback depend on the probe."""
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        duration = float((result.stdout or "").strip())
+        if math.isfinite(duration) and duration > 0:
+            return duration
+    except (OSError, ValueError, subprocess.SubprocessError):
+        logger.debug("Could not probe Voice Chat media duration for %s.", path, exc_info=True)
+    return None
 
 
 def _download_url(url: str, output_dir: Path) -> tuple[Path, str]:
