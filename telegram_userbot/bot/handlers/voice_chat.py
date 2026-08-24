@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import html
+import importlib
+import inspect
+import logging
 import re
+import sys
 import shutil
 import tempfile
 from pathlib import Path
@@ -12,6 +16,8 @@ from pytgcalls.exceptions import NoActiveGroupCall
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from utils.message_ui import reply_html
+
+logger = logging.getLogger(__name__)
 
 
 _VOICE_COMMAND_RE = re.compile(
@@ -24,7 +30,7 @@ _VOICE_COMMAND_RE = re.compile(
 )
 
 
-def _voice_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def _voice_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Resolve only the hosted client bound to this private control chat."""
     message = update.effective_message
     user = update.effective_user
@@ -37,7 +43,26 @@ def _voice_manager(update: Update, context: ContextTypes.DEFAULT_TYPE):
     hosted = manager.get_client(user.id) if manager is not None else None
     if hosted is None or not hosted.is_running():
         return None
-    return getattr(hosted.client, "_voice_chat_manager", None)
+    voice = getattr(hosted.client, "_voice_chat_manager", None)
+    if voice is not None:
+        return voice
+
+    # Recover from a partial plugin load without requiring a full bot restart.
+    # plugin_loader normally installs this compatibility alias before imports.
+    try:
+        import config as runtime_config
+
+        sys.modules["config.config"] = runtime_config
+        module = importlib.import_module("plugins.voice_chat")
+        init = getattr(module, "init", None)
+        if init is not None:
+            result = init(hosted.client)
+            if inspect.isawaitable(result):
+                await result
+        return getattr(hosted.client, "_voice_chat_manager", None)
+    except Exception:
+        logger.exception("Could not lazily recover Voice Chat manager.")
+        return None
 
 
 def _command(message) -> tuple[str, str] | None:
@@ -123,7 +148,7 @@ async def voice_chat_command(
     if parsed is None:
         return
 
-    voice = _voice_manager(update, context)
+    voice = await _voice_manager(update, context)
     # Do not silently discard a private control-bot command. A missing manager
     # means the hosted session is unavailable or the voice plugin failed to
     # load, both of which need an actionable response.
