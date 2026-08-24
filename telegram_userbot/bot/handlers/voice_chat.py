@@ -16,6 +16,7 @@ from pytgcalls.exceptions import NoActiveGroupCall
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from utils.message_ui import reply_html
+from bot.handlers.start import livemic_command
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 _VOICE_COMMAND_RE = re.compile(
     r"^\s*\.(?P<command>"
     r"vcjoin|vcstatus|vcstop|vcleave|play|pause|resume|queue|clearqueue|"
-    r"skip|volume|mute|unmute"
+    r"skip|volume|mute|unmute|livemic"
     r")"
     r"(?:\s+(?P<args>.*?))?\s*$",
     re.IGNORECASE,
@@ -148,6 +149,13 @@ async def voice_chat_command(
     if parsed is None:
         return
 
+    # .livemic belongs to the control-bot surface. Handle it before resolving
+    # hosted state so a valid Mini App request is never misreported as a
+    # missing hosted account.
+    if parsed[0] == "livemic":
+        await livemic_command(update, context)
+        return
+
     voice = await _voice_manager(update, context)
     # Do not silently discard a private control-bot command. A missing manager
     # means the hosted session is unavailable or the voice plugin failed to
@@ -254,7 +262,7 @@ async def voice_chat_command(
 
 
 def build_voice_chat_handler() -> MessageHandler:
-    """Match only dot commands sent to the control bot in private chats."""
+    """Match dot Voice Chat controls sent to the private control bot."""
     return MessageHandler(
         filters.ChatType.PRIVATE
         & filters.TEXT
