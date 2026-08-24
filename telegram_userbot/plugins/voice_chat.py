@@ -1,3 +1,282 @@
+"""Per-hosted-account Telegram voice-chat playback and recording.
+
+All runtime state belongs to one manager per hosted Telethon client.  A hosted
+account can therefore have only one active voice-chat connection, while
+different hosted accounts remain isolated from one another.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+from html import escape
+import logging
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from pytgcalls.exceptions import NoActiveGroupCall
+from pytgcalls import PyTgCalls
+from pytgcalls.pytgcalls_session import PyTgCallsSession
+from pytgcalls.types import MediaStream, RecordStream, StreamEnded, StreamFrames
+from telethon import functions
+from telethon.tl import types as tl_types
+from telethon.utils import get_peer_id
+
+from plugins.bot import add_handler
+
+try:
+    import yt_dlp
+except ImportError:  # pragma: no cover - URL playback reports this at runtime
+    yt_dlp = None
+
+
+logger = logging.getLogger(__name__)
+_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+_MAX_TRACKS = 50
+# The command uses 100 as unity gain: 200 is 2x, 500 is 5x, and 1000 is 10x.
+# This is intentionally much higher than PyTgCalls' call-output range because
+# gain is applied to a temporary playback copy before it is streamed.
+_MAX_VOLUME = 100_000_000
+_SAFE_DEFAULT_VOLUME = 100
+
+
+@dataclass
+class Track:
+    title: str
+    path: Path
+    source: str
+
+
+@dataclass
+class VoiceState:
+    chat_id: int
+    chat_title: str = ""
+    queue: deque[Track] = field(default_factory=deque)
+    current: Track | None = None
+    volume: int = 100
+    muted: bool = False
+    joined_at: float = field(default_factory=time.monotonic)
+    recording_path: Path | None = None
+    recording_task: asyncio.Task | None = None
+    recording_started_at: float | None = None
+    closing: bool = False
+    playback_epoch: int = 0
+    transition_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
+def _safe_title(value: str) -> str:
+    value = " ".join((value or "").split()).strip()
+    return value[:160] or "Voice chat audio"
+
+
+def _format_duration(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, seconds = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {seconds:02d}s"
+    return f"{minutes}m {seconds:02d}s"
+
+
+def _download_url(url: str, output_dir: Path) -> tuple[Path, str]:
+    if yt_dlp is None:
+        raise RuntimeError("URL playback needs the yt-dlp package.")
+    template = str(output_dir / "download.%(ext)s")
+    options = {
+        "format": "bestaudio/best",
+        "outtmpl": template,
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "restrictfilenames": True,
+    }
+    with yt_dlp.YoutubeDL(options) as downloader:
+        info = downloader.extract_info(url, download=True)
+        prepared = Path(downloader.prepare_filename(info))
+        title = _safe_title(info.get("title") or prepared.stem)
+    if not prepared.exists():
+        matches = sorted(output_dir.glob("download.*"))
+        if not matches:
+            raise FileNotFoundError("The audio download did not produce a file.")
+        prepared = matches[0]
+    return prepared, title
+
+
+def _create_gain_copy(source: Path, output_dir: Path, volume: int) -> Path:
+    """Create a gain-only, temporary stream copy without touching ``source``."""
+    playback_path = output_dir / "playback-gain.wav"
+    gain = volume / 100
+    result = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-af",
+            f"volume={gain:.12g}:precision=float",
+            "-c:a",
+            "pcm_f32le",
+            str(playback_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    if result.returncode != 0 or not playback_path.is_file():
+        detail = (result.stderr or result.stdout).strip()
+        raise RuntimeError(
+            "Could not prepare the audio for Voice Chat playback."
+            + (f" {detail[-500:]}" if detail else "")
+        )
+    if playback_path.stat().st_size == 0:
+        raise RuntimeError("The prepared Voice Chat audio file is empty.")
+    return playback_path
+
+
+class VoiceChatManager:
+    """One PyTgCalls connection and one voice-chat state per hosted account."""
+
+    def __init__(self, client):
+        self.client = client
+        self.calls = PyTgCalls(client)
+        self.state: VoiceState | None = None
+        self._started = False
+        self._tasks: set[asyncio.Task] = set()
+        self._temp_dir = Path(tempfile.mkdtemp(prefix="telegram-userbot-vc-"))
+
+    async def start(self) -> None:
+        if self._started:
+            return
+        if not self.client.is_connected():
+            raise RuntimeError("The hosted Telethon client is not connected.")
+        if shutil.which("ffmpeg") is None:
+            raise RuntimeError(
+                "FFmpeg is not available. Install FFmpeg before using Voice Chat."
+            )
+        # PyTgCalls performs a remote version check during its first start.
+        # The check is informational and must not delay the userbot startup.
+        PyTgCallsSession.notice_displayed = True
+
+        async def on_update(_, update):
+            if isinstance(update, StreamFrames):
+                update_chat_id = getattr(update, "chat_id", None)
+                state = self.state
+                chat_match = (
+                    state is not None
+                    and state.chat_id == update_chat_id
+                )
+                direction = str(
+                    getattr(update.direction, "name", update.direction)
+                ).upper()
+                device = str(
+                    getattr(update.device, "name", update.device)
+                ).upper()
+                if chat_match:
+                    logger.info(
+                        "[VOICE_AI_DEBUG] PYTG_CALLS_UPDATE_RECEIVED "
+                        "type=StreamFrames chat_id=%s direction=%s device=%s "
+                        "frame_count=%d CHAT_MATCH=%s.",
+                        update_chat_id,
+                        direction,
+                        device,
+                        len(update.frames),
+                        chat_match,
+                    )
+                if not (chat_match and direction == "INCOMING" and device == "SPEAKER"):
+                    return
+                for frame in update.frames:
+                    payload = (
+                        getattr(
+                            frame,
+                            "frame",
+                            getattr(frame, "data", b""),
+                        )
+                        or b""
+                    )
+                    frame_info = getattr(frame, "info", None)
+                    frame_timestamp = getattr(
+                        frame_info,
+                        "capture_time",
+                        None,
+                    )
+                    voice_ai_active = (
+                        getattr(self, "_voice_ai_enabled", False)
+                        and getattr(self, "_voice_ai_capture_chat_id", None)
+                        == update_chat_id
+                    )
+                    voice_ai_reached = voice_ai_active and len(payload) > 0
+                    if voice_ai_reached:
+                        now = time.monotonic()
+                        self._voice_ai_capture_first_packet_at = (
+                            getattr(
+                                self,
+                                "_voice_ai_capture_first_packet_at",
+                                None,
+                            )
+                            or now
+                        )
+                        self._voice_ai_capture_last_packet_at = now
+                        self._voice_ai_capture_packet_count = (
+                            getattr(
+                                self,
+                                "_voice_ai_capture_packet_count",
+                                0,
+                            )
+                            + 1
+                        )
+                        self._voice_ai_capture_packet_bytes = (
+                            getattr(
+                                self,
+                                "_voice_ai_capture_packet_bytes",
+                                0,
+                            )
+                            + len(payload)
+                        )
+                        activity_event = getattr(
+                            self,
+                            "_voice_ai_capture_activity",
+                            None,
+                        )
+                        if activity_event is not None:
+                            activity_event.set()
+                    logger.info(
+                        "[VOICE_AI_DEBUG] PACKET_RECEIVED chat_id=%s "
+                        "frame_type=%s frame_bytes=%d timestamp=%s "
+                        "PACKET_BYTES=%d CHAT_MATCH=%s VOICE_AI_REACHED=%s.",
+                        update_chat_id,
+                        type(frame).__name__,
+                        len(payload),
+                        frame_timestamp,
+                        len(payload),
+                        chat_match,
+                        voice_ai_reached,
+                    )
+                return
+            if not isinstance(update, StreamEnded):
+                return
+            if getattr(self, "_voice_ai_enabled", False):
+                logger.info(
+                    "[VOICE_AI_DEBUG] stream ended chat=%s type=%s device=%s.",
+                    update.chat_id,
+                    update.stream_type,
+                    update.device,
+                )
+            if update.stream_type != StreamEnded.Type.AUDIO:
+                return
+            state = self.state
             expected_track = (
                 state.current
                 if state is not None
