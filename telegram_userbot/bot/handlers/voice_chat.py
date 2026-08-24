@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _VOICE_COMMAND_RE = re.compile(
     r"^\s*\.(?P<command>"
     r"vcjoin|vcstatus|vcstop|vcleave|play|pause|resume|queue|clearqueue|"
-    r"volume|mute|unmute"
+    r"skip|volume|mute|unmute"
     r")"
     r"(?:\s+(?P<args>.*?))?\s*$",
     re.IGNORECASE,
@@ -226,6 +226,10 @@ async def voice_chat_command(
             if voice.state is None:
                 raise RuntimeError("Join an active Voice Chat first with .vcjoin.")
             text = await voice.clear_queue(voice.state.chat_id)
+        elif command == "skip":
+            if voice.state is None:
+                raise RuntimeError("Join an active Voice Chat first with .vcjoin.")
+            text = await voice.skip(voice.state.chat_id)
         elif command == "volume":
             if voice.state is None:
                 raise RuntimeError("Join an active Voice Chat first with .vcjoin.")
