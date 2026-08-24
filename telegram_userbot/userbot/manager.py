@@ -28,7 +28,19 @@ class UserbotManager:
         Always re-establish durable MongoDB storage before reading the active
         list. Never treat the ephemeral local fallback as an empty hosted list.
         """
-        if not await db.ensure_persistent_storage():
+        storage_ready = False
+        for attempt in range(1, 7):
+            if await db.ensure_persistent_storage():
+                storage_ready = True
+                break
+            delay = min(2 ** attempt, 30)
+            logger.warning(
+                "Durable MongoDB is not ready during startup (attempt %d/6); retrying in %ds.",
+                attempt,
+                delay,
+            )
+            await asyncio.sleep(delay)
+        if not storage_ready:
             logger.error(
                 "Hosted sessions were not restored: durable MongoDB storage is unavailable."
             )
@@ -41,12 +53,30 @@ class UserbotManager:
                 exc,
             )
             return
-        tasks = [self._start_one(user["user_id"], user["session_string"]) for user in users]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for user, result in zip(users, results):
-            if isinstance(result, Exception):
-                logger.error("Failed to start userbot for %s: %s", user["user_id"], result)
-        logger.info("Started %d userbot(s).", len(self._clients))
+        pending = users
+        for attempt in range(1, 4):
+            if not pending:
+                break
+            tasks = [self._start_one(user["user_id"], user["session_string"]) for user in pending]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            failed = []
+            for user, result in zip(pending, results):
+                if isinstance(result, Exception):
+                    failed.append(user)
+                    logger.error(
+                        "Failed to restore hosted userbot for %s (attempt %d/3): %s",
+                        user["user_id"],
+                        attempt,
+                        result,
+                    )
+            pending = failed
+            if pending and attempt < 3:
+                await asyncio.sleep(3 * attempt)
+        logger.info(
+            "Started %d userbot(s); %d session(s) remain persisted for a later retry.",
+            len(self._clients),
+            len(pending),
+        )
 
     async def _start_one(self, user_id: int, session_string: str) -> None:
         client = UserbotClient(user_id, session_string)
