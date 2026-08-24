@@ -51,7 +51,7 @@ MINI_APP_URL: str = os.environ.get("MINI_APP_URL", "").strip()
 MINI_APP_PATH: str = "/mini-app/"
 MINI_APP_PUBLIC_PATH: str = os.environ.get(
     "MINI_APP_PUBLIC_PATH",
-    "/api/mini-app/",
+    MINI_APP_PATH,
 ).strip()
 WEBAPP_PORT: int = _int_env("PORT", "MINI_APP_PORT", default=8008)
 
