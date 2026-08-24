@@ -995,16 +995,17 @@ class VoiceChatManager:
             with contextlib.suppress(Exception):
                 if state.live_active:
                     await self.stop_live(chat_id)
-            # leave_call() removes the Telegram call, but PyTgCalls can retain
-            # its transport/session state. Stop and recreate the wrapper so a
-            # later .vcjoin always starts from a clean connection.
+            # py-tgcalls 2.3.3 has no public stop() method. Its leave_call()
+            # normally clears the call, but explicitly clear the binding and
+            # every per-chat cache as well so the next .vcjoin cannot inherit
+            # a pending connection or stale peer/call entry.
             calls = self.calls
             with contextlib.suppress(Exception):
                 await calls.leave_call(chat_id)
             with contextlib.suppress(Exception):
-                await calls.stop()
-            self.calls = PyTgCalls(self.client)
-            self._started = False
+                await calls._clear_call(chat_id)
+            with contextlib.suppress(Exception):
+                calls._clear_cache(chat_id)
         finally:
             self._clear_state(state)
             self.state = None
