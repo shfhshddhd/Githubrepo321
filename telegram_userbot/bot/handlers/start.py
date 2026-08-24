@@ -38,9 +38,6 @@ After <code>/host</code> succeeds, use these commands from your hosted account:
 <code>.volume &lt;value&gt;</code> / <code>.mute</code> / <code>.unmute</code>
 Reply to audio/voice/video with <code>.play</code> — play it in the connected Voice Chat
 
-🎙️ <b>Live Mic</b>
-<code>/livemic</code> — open the Live Mic control panel (join with <code>.vcjoin</code> first)
-
 The complete plugin command list is available through <code>.help</code>.
 """
 
@@ -110,9 +107,6 @@ After <code>/host</code> succeeds, use these commands from your hosted account:
 <code>.volume &lt;value&gt;</code> / <code>.mute</code> / <code>.unmute</code>
 Reply to audio/voice/video with <code>.play</code> — play it in the connected Voice Chat
 
-🎙️ <b>Live Mic</b>
-<code>/livemic</code> — open the Live Mic control panel
-
 The complete plugin command list is available through <code>.help</code>.
 """
 
@@ -140,7 +134,7 @@ def _live_vc_markup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def livemic_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """Expose Live Mic as a stable slash command as well as a /start button."""
+    """Expose Live Mic only through the private control-bot dot command."""
     if update.effective_chat is None or update.effective_chat.type != "private":
         return
     mini_app = ctx.bot_data.get("mini_app_server")
