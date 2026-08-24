@@ -187,6 +187,8 @@ async def voice_chat_command(
 
     command, args = parsed
     try:
+        # Detect Telegram-app joins/leaves before every Voice Chat command.
+        await voice.reconcile_state()
         if command == "vcjoin":
             text = await voice.join_target(args)
         elif command == "vcstatus":
