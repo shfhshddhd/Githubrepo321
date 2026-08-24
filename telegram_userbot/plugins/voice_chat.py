@@ -33,6 +33,10 @@ from pytgcalls.types import (
     StreamEnded,
     StreamFrames,
 )
+try:
+    from pytgcalls.types import GroupCallConfig
+except ImportError:  # pragma: no cover - older PyTgCalls compatibility
+    GroupCallConfig = None
 from pytgcalls.types.raw import AudioParameters
 from telethon import functions
 from telethon.tl import types as tl_types
@@ -442,7 +446,18 @@ class VoiceChatManager:
             )
 
         try:
-            await self.calls.play(chat_id, None)
+            # This is a join-only command. PyTgCalls defaults GroupCallConfig
+            # to auto_start=True, which can create a new call or behave
+            # differently across library versions after the Telegram-side
+            # active-call check above. Keep the two operations consistent.
+            if GroupCallConfig is not None:
+                await self.calls.play(
+                    chat_id,
+                    None,
+                    config=GroupCallConfig(auto_start=False),
+                )
+            else:
+                await self.calls.play(chat_id, None)
         except NoActiveGroupCall:
             raise
         except Exception as exc:
@@ -1254,8 +1269,6 @@ async def init(client_instance):
 
 
 async def register_commands():
-    if _manager is None:
-        raise RuntimeError("Voice-chat manager could not load.")
     add_handler(
         "voice_chat",
         [
