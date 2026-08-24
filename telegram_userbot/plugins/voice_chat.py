@@ -481,10 +481,12 @@ class VoiceChatManager:
                 f"(<code>{chat_id}</code>)."
             )
 
-        # Clear any local binding left by a prior leave or failed join before
-        # asking PyTgCalls to connect to this group.
-        await self._clear_call_binding(self._bound_chat_id)
-        await self._clear_call_binding(chat_id)
+        # A fresh join must never reuse a PyTgCalls/NTgCalls transport, even
+        # when the previous leave already cleared VoiceState and bound_chat_id.
+        # Recreate the wrapper here as a final barrier against stale same-group
+        # and cross-group connection registries.
+        await self._reset_transport()
+        await self.start()
 
         try:
             # This is a join-only command. PyTgCalls defaults GroupCallConfig
