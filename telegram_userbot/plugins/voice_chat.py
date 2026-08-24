@@ -481,14 +481,15 @@ class VoiceChatManager:
                 f"(<code>{chat_id}</code>)."
             )
 
+        # Clear known per-chat registries before replacing the transport.
+        await self._clear_call_binding(self._bound_chat_id)
+        await self._clear_call_binding(chat_id)
         # A fresh join must never reuse a PyTgCalls/NTgCalls transport, even
         # when the previous leave already cleared VoiceState and bound_chat_id.
-        # Recreate the wrapper here as a final barrier against stale same-group
-        # and cross-group connection registries.
         await self._reset_transport()
         await self.start()
 
-        try:
+        async def connect_fresh() -> None:
             # This is a join-only command. PyTgCalls defaults GroupCallConfig
             # to auto_start=True, which can create a new call or behave
             # differently across library versions after the Telegram-side
@@ -501,7 +502,34 @@ class VoiceChatManager:
                 )
             else:
                 await self.calls.play(chat_id, None)
+
+        try:
+            await connect_fresh()
+        except Exception as exc:
+            message = str(exc).lower()
+            if "already" not in message or "connect" not in message:
+                if isinstance(exc, NoActiveGroupCall):
+                    await self._clear_call_binding(chat_id)
+                    raise
+                await self._clear_call_binding(chat_id)
+                raise RuntimeError(f"Could not connect to the active Voice Chat: {exc}") from exc
+            # PyTgCalls can report a stale binding once after leave. Recreate
+            # the wrapper and retry exactly once; never loop on this error.
+            logger.warning("Recovering stale PyTgCalls Voice Chat binding for %s.", chat_id)
+            await self._clear_call_binding(chat_id)
+            await self._reset_transport()
+            await self.start()
+            try:
+                await connect_fresh()
+            except NoActiveGroupCall:
+                await self._clear_call_binding(chat_id)
+                raise
+            except Exception as retry_exc:
+                await self._clear_call_binding(chat_id)
+                raise RuntimeError(f"Could not connect to the active Voice Chat: {retry_exc}") from retry_exc
         except NoActiveGroupCall:
+            await self._clear_call_binding(chat_id)
+            raise
             await self._clear_call_binding(chat_id)
             raise
         except Exception as exc:
