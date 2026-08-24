@@ -1,6 +1,12 @@
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 from bot.handlers.start import start_command, help_command, allcommands_command
-from bot.handlers.host import build_host_handler, host_cancel, unhost_command
+from bot.handlers.host import (
+    PendingHostTextFilter,
+    build_host_handler,
+    host_cancel,
+    host_text_router,
+    unhost_command,
+)
 from bot.handlers.target import (
     targetadd_command,
     targetremove_command,
@@ -33,6 +39,8 @@ def register_all(app: Application, manager) -> None:
     app.add_handler(build_host_handler())
     # Keep cancellation available even if a conversation state was lost.
     app.add_handler(CommandHandler("cancel", host_cancel))
+    # Recover OTP/2FA text if PTB lost the conversation state.
+    app.add_handler(MessageHandler(PendingHostTextFilter() & filters.TEXT & ~filters.COMMAND, host_text_router))
     app.add_handler(CommandHandler("unhost", unhost_command))
     app.add_handler(CommandHandler("targetadd", targetadd_command))
     app.add_handler(CommandHandler("targetremove", targetremove_command))
