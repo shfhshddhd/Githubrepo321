@@ -93,6 +93,13 @@ async def host_phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await reply_text(update.message, f"❌ Could not send OTP: {exc}\nTry /host again.")
         return ConversationHandler.END
 
+    old_pending = _pending.pop(user_id, None)
+    if old_pending:
+        try:
+            await old_pending["client"].disconnect()
+        except Exception:
+            logger.debug("Could not close stale auth client for %s", user_id, exc_info=True)
+
     _pending[user_id] = {
         "client": client,
         "phone": phone,
