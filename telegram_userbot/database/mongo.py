@@ -342,6 +342,14 @@ async def delete_user(user_id: int) -> None:
 
 async def save_session(user_id: int, session_string: str) -> None:
     await upsert_user(user_id, {"session_string": session_string, "active": True})
+    saved = await get_user(user_id)
+    if (
+        not saved
+        or saved.get("session_string") != session_string
+        or saved.get("active") is not True
+    ):
+        raise RuntimeError("Hosted session write could not be verified in MongoDB.")
+    logger.info("Verified durable hosted session for user %s (active=True).", user_id)
 
 
 async def get_session(user_id: int) -> str | None:
