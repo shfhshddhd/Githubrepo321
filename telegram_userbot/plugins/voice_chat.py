@@ -209,6 +209,9 @@ class VoiceChatManager:
         # poison the next join, including joins to a different group.
         self._bound_chat_id: int | None = None
         self._started = False
+        # Join and leave can arrive from separate Telegram async handlers.
+        # Serialize the full lifecycle so a new join never races old cleanup.
+        self._lifecycle_lock = asyncio.Lock()
         self._tasks: set[asyncio.Task] = set()
         self._temp_dir = Path(tempfile.mkdtemp(prefix="telegram-userbot-vc-"))
 
@@ -470,6 +473,11 @@ class VoiceChatManager:
         return getattr(full_chat.full_chat, "call", None)
 
     async def join_target(self, identifier: str) -> str:
+        """Serialize a fresh Voice Chat join against leave/cleanup."""
+        async with self._lifecycle_lock:
+            return await self._join_target(identifier)
+
+    async def _join_target(self, identifier: str) -> str:
         """Resolve a group, require an active VC, then connect once."""
         if not identifier:
             raise ValueError("Usage: .vcjoin <group username or chat ID>")
@@ -1156,6 +1164,11 @@ class VoiceChatManager:
         return "⏹️ Playback stopped; I am still in the voice chat."
 
     async def leave(self, chat_id: int) -> str:
+        """Serialize remote leave, local cleanup, and transport replacement."""
+        async with self._lifecycle_lock:
+            return await self._leave(chat_id)
+
+    async def _leave(self, chat_id: int) -> str:
         state = self._require_state(chat_id)
         if state.recording_path is not None:
             with contextlib.suppress(Exception):
