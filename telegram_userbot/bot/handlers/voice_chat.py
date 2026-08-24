@@ -124,8 +124,28 @@ async def voice_chat_command(
         return
 
     voice = _voice_manager(update, context)
-    # Ignore group commands and senders without an authorized hosted account.
+    # Do not silently discard a private control-bot command. A missing manager
+    # means the hosted session is unavailable or the voice plugin failed to
+    # load, both of which need an actionable response.
     if voice is None:
+        manager = context.bot_data.get("manager")
+        user = update.effective_user
+        hosted = (
+            manager.get_client(user.id)
+            if manager is not None and user is not None
+            else None
+        )
+        if hosted is None or not hosted.is_running():
+            await reply_html(
+                message,
+                "❌ No active hosted Telegram account. Use /host first.",
+            )
+        else:
+            await reply_html(
+                message,
+                "❌ Voice Chat plugin is unavailable for this hosted account. "
+                "Restart the bot and check the plugin-load error logs.",
+            )
         return
 
     command, args = parsed
