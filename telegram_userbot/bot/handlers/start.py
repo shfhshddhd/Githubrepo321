@@ -103,9 +103,8 @@ The complete plugin command list is available through <code>.help</code>.
 """
 
 
-async def start_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+def _live_vc_markup(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     mini_app = ctx.bot_data.get("mini_app_server")
-    markup = None
     if (
         update.effective_chat is not None
         and update.effective_chat.type == "private"
@@ -113,14 +112,33 @@ async def start_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         and mini_app is not None
         and mini_app.is_running
     ):
-        markup = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Open Live VC", web_app=WebAppInfo(config.mini_app_url()))]]
+        return InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "Open Live Mic / VC",
+                        web_app=WebAppInfo(config.mini_app_url()),
+                    )
+                ]
+            ]
         )
-    await reply_html(update.message, MENU_TEXT, reply_markup=markup)
+    return None
+
+
+async def start_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    await reply_html(
+        update.message,
+        MENU_TEXT,
+        reply_markup=_live_vc_markup(update, ctx),
+    )
 
 
 async def help_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    await reply_html(update.message, MENU_TEXT)
+    await reply_html(
+        update.message,
+        MENU_TEXT,
+        reply_markup=_live_vc_markup(update, ctx),
+    )
 
 
 async def allcommands_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
