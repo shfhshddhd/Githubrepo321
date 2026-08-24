@@ -105,6 +105,7 @@ async def host_phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         "phone": phone,
         "phone_code_hash": phone_code_hash,
         "delivery_type": delivery_type,
+        "stage": "otp",
     }
     delivery_hint = {
         "SentCodeTypeApp": (
@@ -151,7 +152,10 @@ async def host_otp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
     except SessionPasswordNeededError:
-        # Keep the client alive in _pending so we can use it for 2FA
+        # Persist the phase independently of PTB's conversation state.
+        # This prevents a retry/reroute from sending the 2FA password
+        # through the phone-number parser.
+        pending["stage"] = "password"
         await reply_text(
             update.message,
             "🔒 Your account has Two-Step Verification enabled.\n"
@@ -208,13 +212,24 @@ async def host_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def host_text_router(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    """Route auth text by the durable pending phase, not only PTB state."""
+    pending = _pending.get(update.effective_user.id)
+    if pending and pending.get("stage") == "password":
+        return await host_password(update, ctx)
+    if pending and pending.get("stage") == "otp":
+        return await host_otp(update, ctx)
+    return await host_phone(update, ctx)
+
+
 def build_host_handler() -> ConversationHandler:
+    text = MessageHandler(filters.TEXT & ~filters.COMMAND, host_text_router)
     return ConversationHandler(
         entry_points=[CommandHandler("host", host_start)],
         states={
-            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_phone)],
-            OTP: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_otp)],
-            PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, host_password)],
+            PHONE: [text],
+            OTP: [text],
+            PASSWORD: [text],
         },
         fallbacks=[CommandHandler("cancel", host_cancel)],
         allow_reentry=True,
