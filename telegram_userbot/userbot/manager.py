@@ -49,6 +49,8 @@ class UserbotManager:
 
     async def add_session(self, user_id: int, session_string: str) -> None:
         """Persist and start a newly authenticated userbot."""
+        if not db.has_persistent_storage():
+            raise RuntimeError("Persistent MongoDB storage is unavailable; refusing to host a session that could be lost on restart.")
         if user_id in self._clients:
             await self._clients[user_id].stop()
         await db.save_session(user_id, session_string)
