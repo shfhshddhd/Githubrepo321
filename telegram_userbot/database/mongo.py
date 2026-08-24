@@ -303,6 +303,25 @@ def has_persistent_storage() -> bool:
     return _client is not None
 
 
+async def ensure_persistent_storage() -> bool:
+    """Retry MongoDB after a transient startup/network failure.
+
+    The local fallback is intentionally never treated as durable storage:
+    hosted sessions must not be reported as saved when the runner workspace
+    may disappear on the next deployment.
+    """
+    if has_persistent_storage():
+        return True
+    if not MONGO_URI:
+        return False
+    try:
+        await connect()
+    except Exception as exc:
+        logger.error("Persistent MongoDB retry failed: %s", exc)
+        return False
+    return has_persistent_storage()
+
+
 async def get_user(user_id: int) -> dict | None:
     return await get_db().users.find_one({"user_id": user_id})
 
