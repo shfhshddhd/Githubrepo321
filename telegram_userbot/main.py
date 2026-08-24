@@ -46,6 +46,7 @@ CONTROL_BOT_COMMANDS = [
     BotCommand("delkey", "Owner: delete a provider key"),
     BotCommand("switchkey", "Owner: choose a provider key"),
     BotCommand("allcommands", "Show all control-bot commands"),
+    BotCommand("livemic", "Open the Live Mic control panel"),
 ]
 
 
