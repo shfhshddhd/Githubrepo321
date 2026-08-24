@@ -161,6 +161,9 @@ class VoiceChatManager:
         self.client = client
         self.calls = PyTgCalls(client)
         self.state: VoiceState | None = None
+        # Track PyTgCalls' last local binding so failed/manual leaves cannot
+        # poison the next join, including joins to a different group.
+        self._bound_chat_id: int | None = None
         self._started = False
         self._tasks: set[asyncio.Task] = set()
         self._temp_dir = Path(tempfile.mkdtemp(prefix="telegram-userbot-vc-"))
@@ -346,6 +349,17 @@ class VoiceChatManager:
             logger.warning("Could not verify Telegram Voice Chat membership for %s.", getattr(entity, "id", None), exc_info=True)
             return None
 
+    async def _clear_call_binding(self, chat_id: int | None) -> None:
+        """Drop PyTgCalls' local binding/cache for one chat, best effort."""
+        if chat_id is None:
+            return
+        with contextlib.suppress(Exception):
+            await self.calls._clear_call(chat_id)
+        with contextlib.suppress(Exception):
+            self.calls._clear_cache(chat_id)
+        if self._bound_chat_id == chat_id:
+            self._bound_chat_id = None
+
     async def _reset_connection_state(self, state: VoiceState, *, leave_remote: bool = False) -> None:
         """Clear local PyTgCalls state even when Telegram already removed us."""
         state.closing = True
@@ -357,10 +371,7 @@ class VoiceChatManager:
                     await self.calls.leave_call(state.chat_id)
             # py-tgcalls 2.3.3 needs both cleanup paths when Telegram has
             # already processed a manual leave or leave_call raised.
-            with contextlib.suppress(Exception):
-                await self.calls._clear_call(state.chat_id)
-            with contextlib.suppress(Exception):
-                self.calls._clear_cache(state.chat_id)
+            await self._clear_call_binding(state.chat_id)
         finally:
             self._clear_state(state)
             if self.state is state:
@@ -377,7 +388,7 @@ class VoiceChatManager:
         except Exception:
             logger.warning("Could not reconcile Voice Chat state for %s.", state.chat_id, exc_info=True)
             return True
-        if await self._is_current_user_in_call(entity, call) is False:
+        if call is None or await self._is_current_user_in_call(entity, call) is False:
             await self._reset_connection_state(state)
             logger.info("Cleared stale Voice Chat state after Telegram-side leave: chat_id=%s.", state.chat_id)
             return False
@@ -437,6 +448,11 @@ class VoiceChatManager:
                 f"(<code>{chat_id}</code>)."
             )
 
+        # Clear any local binding left by a prior leave or failed join before
+        # asking PyTgCalls to connect to this group.
+        await self._clear_call_binding(self._bound_chat_id)
+        await self._clear_call_binding(chat_id)
+
         try:
             # This is a join-only command. PyTgCalls defaults GroupCallConfig
             # to auto_start=True, which can create a new call or behave
@@ -451,10 +467,13 @@ class VoiceChatManager:
             else:
                 await self.calls.play(chat_id, None)
         except NoActiveGroupCall:
+            await self._clear_call_binding(chat_id)
             raise
         except Exception as exc:
+            await self._clear_call_binding(chat_id)
             raise RuntimeError(f"Could not connect to the active Voice Chat: {exc}") from exc
 
+        self._bound_chat_id = chat_id
         self.state = VoiceState(
             chat_id=chat_id,
             chat_title=_safe_title(getattr(entity, "title", None)),
@@ -1287,6 +1306,8 @@ async def register_commands():
         command = event.pattern_match.group(1).lower()
         args = (event.pattern_match.group(2) or "").strip()
         try:
+            # Keep the hosted-client command surface synchronized as well.
+            await manager.reconcile_state()
             if command == "vcjoin":
                 text = await manager.join_target(args)
             elif command == "vcstatus":
