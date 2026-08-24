@@ -24,7 +24,7 @@ from pytgcalls.exceptions import NoActiveGroupCall
 from pytgcalls import PyTgCalls
 from pytgcalls.pytgcalls_session import PyTgCallsSession
 from pytgcalls.types import MediaStream, RecordStream, StreamEnded, StreamFrames
-from telethon import functions
+from telethon import events, functions
 from telethon.tl import types as tl_types
 from telethon.utils import get_peer_id
 
@@ -1203,6 +1203,7 @@ async def register_commands():
             ".play — Play replied audio in the connected Voice Chat",
             ".pause / .resume / .skip / .queue / .clearqueue — Playback controls",
             ".volume <0-100000000> / .mute / .unmute — Gain-only playback controls",
+            ".livemic — Open the Live Mic / Voice Chat Mini App from the control bot",
         ],
         "Private control-bot Voice Chat playback and gain-only controls",
     )
