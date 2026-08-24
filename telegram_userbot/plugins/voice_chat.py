@@ -54,6 +54,8 @@ _MAX_TRACKS = 50
 # gain is applied to a temporary playback copy before it is streamed.
 _MAX_VOLUME = 100_000_000
 _SAFE_DEFAULT_VOLUME = 100
+# Small buffer for ffprobe/stream end timing before queue advancement.
+_PLAYBACK_END_GRACE_SECONDS = 2.0
 
 
 @dataclass
