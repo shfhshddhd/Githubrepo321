@@ -33,10 +33,18 @@ def _int_list_env(*names: str) -> list[int]:
     return []
 
 
-BOT_TOKEN: str = os.environ.get("BOT_TOKEN", "")
-API_ID: int = _int_env("TELEGRAM_API_ID")
-API_HASH: str = os.environ.get("TELEGRAM_API_HASH", "")
-MONGO_URI: str = os.environ.get("MONGO_URI", "")
+BOT_TOKEN: str = os.environ.get("BOT_TOKEN", "").strip()
+# Accept both the documented TELEGRAM_* names and the short names commonly
+# used by existing GitHub Actions secret sets.
+API_ID: int = _int_env("TELEGRAM_API_ID", "API_ID")
+API_HASH: str = (
+    os.environ.get("TELEGRAM_API_HASH", "").strip()
+    or os.environ.get("API_HASH", "").strip()
+)
+MONGO_URI: str = (
+    os.environ.get("MONGO_URI", "").strip()
+    or os.environ.get("MONGODB_URI", "").strip()
+)
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 SESSION_SECRET: str = os.environ.get("SESSION_SECRET", "")
 MINI_APP_URL: str = os.environ.get("MINI_APP_URL", "").strip()
