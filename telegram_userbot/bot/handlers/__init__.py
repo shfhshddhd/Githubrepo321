@@ -1,6 +1,6 @@
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler
 from bot.handlers.start import start_command, help_command, allcommands_command
-from bot.handlers.host import build_host_handler, unhost_command
+from bot.handlers.host import build_host_handler, host_cancel, unhost_command
 from bot.handlers.target import (
     targetadd_command,
     targetremove_command,
@@ -31,6 +31,8 @@ def register_all(app: Application, manager) -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("allcommands", allcommands_command))
     app.add_handler(build_host_handler())
+    # Keep cancellation available even if a conversation state was lost.
+    app.add_handler(CommandHandler("cancel", host_cancel))
     app.add_handler(CommandHandler("unhost", unhost_command))
     app.add_handler(CommandHandler("targetadd", targetadd_command))
     app.add_handler(CommandHandler("targetremove", targetremove_command))
