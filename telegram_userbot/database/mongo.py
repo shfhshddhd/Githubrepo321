@@ -298,6 +298,11 @@ def get_db() -> Any:
 
 # ── User record ────────────────────────────────────────────────────────────────
 
+def has_persistent_storage() -> bool:
+    """Whether hosted sessions survive a process restart."""
+    return _client is not None
+
+
 async def get_user(user_id: int) -> dict | None:
     return await get_db().users.find_one({"user_id": user_id})
 
