@@ -324,6 +324,65 @@ class VoiceChatManager:
             raise RuntimeError("I am not connected to a voice chat here.")
         return self.state
 
+    async def _is_current_user_in_call(self, entity, call) -> bool | None:
+        """Return whether this account is actually a participant in Telegram's VC."""
+        if call is None:
+            return False
+        try:
+            me = await self.client.get_me()
+            input_peer = await self.client.get_input_entity(me.id)
+            input_call = (
+                call
+                if isinstance(call, tl_types.InputGroupCall)
+                else tl_types.InputGroupCall(id=call.id, access_hash=call.access_hash)
+            )
+            result = await self.client(
+                functions.phone.GetGroupParticipantsRequest(
+                    call=input_call, ids=[input_peer], sources=[], offset=0, limit=1
+                )
+            )
+            return bool(getattr(result, "participants", []))
+        except Exception:
+            logger.warning("Could not verify Telegram Voice Chat membership for %s.", getattr(entity, "id", None), exc_info=True)
+            return None
+
+    async def _reset_connection_state(self, state: VoiceState, *, leave_remote: bool = False) -> None:
+        """Clear local PyTgCalls state even when Telegram already removed us."""
+        state.closing = True
+        with contextlib.suppress(Exception):
+            await self.stop_ai_voice()
+        try:
+            if leave_remote:
+                with contextlib.suppress(Exception):
+                    await self.calls.leave_call(state.chat_id)
+            # py-tgcalls 2.3.3 needs both cleanup paths when Telegram has
+            # already processed a manual leave or leave_call raised.
+            with contextlib.suppress(Exception):
+                await self.calls._clear_call(state.chat_id)
+            with contextlib.suppress(Exception):
+                self.calls._clear_cache(state.chat_id)
+        finally:
+            self._clear_state(state)
+            if self.state is state:
+                self.state = None
+
+    async def reconcile_state(self) -> bool:
+        """Make local state follow Telegram before handling a VC command."""
+        state = self.state
+        if state is None:
+            return False
+        try:
+            entity = await self.client.get_entity(state.chat_id)
+            call = await self._active_group_call(entity)
+        except Exception:
+            logger.warning("Could not reconcile Voice Chat state for %s.", state.chat_id, exc_info=True)
+            return True
+        if await self._is_current_user_in_call(entity, call) is False:
+            await self._reset_connection_state(state)
+            logger.info("Cleared stale Voice Chat state after Telegram-side leave: chat_id=%s.", state.chat_id)
+            return False
+        return True
+
     async def _active_group_call(self, entity):
         """Return Telegram's active group-call descriptor, if one exists."""
         if isinstance(entity, tl_types.Channel):
@@ -343,6 +402,7 @@ class VoiceChatManager:
         if not identifier:
             raise ValueError("Usage: .vcjoin <group username or chat ID>")
         await self.start()
+        await self.reconcile_state()
         try:
             entity = await self.client.get_entity(
                 int(identifier) if identifier.lstrip("-").isdigit() else identifier.lstrip("@")
@@ -987,28 +1047,13 @@ class VoiceChatManager:
 
     async def leave(self, chat_id: int) -> str:
         state = self._require_state(chat_id)
-        await self.stop_ai_voice()
-        state.closing = True
-        try:
-            if state.recording_path is not None:
+        if state.recording_path is not None:
+            with contextlib.suppress(Exception):
                 await self._stop_recording(state, chat_id, send_file=False)
-            with contextlib.suppress(Exception):
-                if state.live_active:
-                    await self.stop_live(chat_id)
-            # py-tgcalls 2.3.3 has no public stop() method. Its leave_call()
-            # normally clears the call, but explicitly clear the binding and
-            # every per-chat cache as well so the next .vcjoin cannot inherit
-            # a pending connection or stale peer/call entry.
-            calls = self.calls
-            with contextlib.suppress(Exception):
-                await calls.leave_call(chat_id)
-            with contextlib.suppress(Exception):
-                await calls._clear_call(chat_id)
-            with contextlib.suppress(Exception):
-                calls._clear_cache(chat_id)
-        finally:
-            self._clear_state(state)
-            self.state = None
+        with contextlib.suppress(Exception):
+            if state.live_active:
+                await self.stop_live(chat_id)
+        await self._reset_connection_state(state, leave_remote=True)
         return "👋 Left the voice chat and cleared the queue."
 
     async def change_volume(self, chat_id: int, value: int) -> str:
@@ -1056,6 +1101,7 @@ class VoiceChatManager:
 
     async def control_status(self) -> str:
         """Status response for the private control bot."""
+        await self.reconcile_state()
         if self.state is None:
             return "❌ Not connected to any Voice Chat."
         return await self.status(self.state.chat_id)
