@@ -1,10 +1,5 @@
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler
-from bot.handlers.start import (
-    start_command,
-    help_command,
-    allcommands_command,
-    livemic_command,
-)
+from bot.handlers.start import start_command, help_command, allcommands_command
 from bot.handlers.host import build_host_handler, unhost_command
 from bot.handlers.target import (
     targetadd_command,
@@ -35,7 +30,6 @@ def register_all(app: Application, manager) -> None:
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("allcommands", allcommands_command))
-    app.add_handler(CommandHandler("livemic", livemic_command))
     app.add_handler(build_host_handler())
     app.add_handler(CommandHandler("unhost", unhost_command))
     app.add_handler(CommandHandler("targetadd", targetadd_command))
