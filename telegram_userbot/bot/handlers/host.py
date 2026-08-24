@@ -11,6 +11,7 @@ import logging
 import re
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError
 from telegram import Update
+from telegram.ext.filters import BaseFilter
 from telegram.ext import (
     CommandHandler,
     ConversationHandler,
@@ -27,6 +28,14 @@ PHONE, OTP, PASSWORD = range(3)
 # Temporary auth state keyed by bot user_id
 # {user_id: {"client": TelegramClient, "phone": str, "phone_code_hash": str}}
 _pending: dict[int, dict] = {}
+
+class PendingHostTextFilter(BaseFilter):
+    """Match text only while this user has an in-flight /host login."""
+
+    def filter(self, message) -> bool:
+        user = getattr(message, "from_user", None)
+        return user is not None and user.id in _pending
+
 
 HOST_SUCCESS_TEXT = (
     "🎉 <b>Your account has been hosted successfully!</b>\n\n"
@@ -139,6 +148,11 @@ async def host_otp(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
         await reply_text(update.message, "❌ Session expired. Please start over with /host.")
         return ConversationHandler.END
 
+    if not otp:
+        await reply_text(update.message, "❌ Please enter the OTP digits Telegram sent you.")
+        return OTP
+
+    await reply_text(update.message, "🔐 Verifying OTP…")
     try:
         await manager.sign_in_with_code(
             user_id=user_id,
