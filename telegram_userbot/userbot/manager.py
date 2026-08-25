@@ -19,8 +19,46 @@ class UserbotManager:
     def __init__(self):
         # Maps bot user_id → UserbotClient
         self._clients: dict[int, UserbotClient] = {}
+        self._restore_task: asyncio.Task | None = None
+        self._restore_lock = asyncio.Lock()
 
     # ── Startup ────────────────────────────────────────────────────────────────
+
+    def _schedule_restore_retry(self) -> None:
+        if self._restore_task is None or self._restore_task.done():
+            self._restore_task = asyncio.create_task(
+                self._restore_until_healthy(),
+                name="restore-hosted-sessions",
+            )
+
+    async def _restore_until_healthy(self) -> None:
+        """Retry durable session restoration after transient restart failures."""
+        for attempt in range(1, 41):
+            try:
+                async with self._restore_lock:
+                    if await db.ensure_persistent_storage():
+                        users = await db.get_all_active_users()
+                        pending = [
+                            user for user in users
+                            if not self.is_hosted(int(user["user_id"]))
+                        ]
+                        if pending:
+                            results = await asyncio.gather(
+                                *(self._start_one(user["user_id"], user["session_string"]) for user in pending),
+                                return_exceptions=True,
+                            )
+                            for user, result in zip(pending, results):
+                                if isinstance(result, Exception):
+                                    logger.warning(
+                                        "Deferred restore failed for hosted user %s (attempt %d/40): %s",
+                                        user["user_id"], attempt, result,
+                                    )
+                        if not any(not self.is_hosted(int(user["user_id"])) for user in users):
+                            return
+            except Exception as exc:
+                logger.warning("Deferred hosted-session restore attempt %d/40 failed: %s", attempt, exc)
+            await asyncio.sleep(15)
+        logger.error("Durable hosted-session restore exhausted retries; records were preserved.")
 
     async def start_all(self) -> None:
         """Restore every explicitly hosted session after process restart.
@@ -44,6 +82,7 @@ class UserbotManager:
             logger.error(
                 "Hosted sessions were not restored: durable MongoDB storage is unavailable."
             )
+            self._schedule_restore_retry()
             return
         try:
             users = await db.get_all_active_users()
@@ -52,6 +91,7 @@ class UserbotManager:
                 "Could not restore hosted userbots because the database is unavailable: %s",
                 exc,
             )
+            self._schedule_restore_retry()
             return
         pending = users
         for attempt in range(1, 4):
@@ -77,6 +117,8 @@ class UserbotManager:
             len(self._clients),
             len(pending),
         )
+        if pending:
+            self._schedule_restore_retry()
 
     async def _start_one(self, user_id: int, session_string: str) -> None:
         client = UserbotClient(user_id, session_string)
